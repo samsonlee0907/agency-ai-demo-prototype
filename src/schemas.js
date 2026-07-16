@@ -193,6 +193,107 @@ export const assistantOutputSchema = z.object({
   suggestions: z.array(z.string().min(2).max(160)).min(1).max(3)
 });
 
+export const maintenanceRequestSchema = z.object({
+  mode: modeSchema,
+  assetId: z.string().min(1),
+  horizon: z.coerce.number().int().refine((value) => [7, 30, 90].includes(value), "Forecast horizon must be 7, 30 or 90 days.")
+});
+
+const maintenanceEvidenceSchema = z.object({
+  signalId: z.string().min(1),
+  label: z.string().min(2).max(120),
+  reading: z.string().min(1).max(80),
+  severity: z.enum(["Normal", "Watch", "Elevated", "Critical"]),
+  interpretation: z.string().min(10).max(500)
+});
+
+export const maintenanceOutputSchema = z.object({
+  healthScore: z.number().int().min(0).max(100),
+  failureRisk: z.enum(["Low", "Moderate", "High", "Critical"]),
+  confidence: z.number().int().min(0).max(100),
+  predictedIssue: z.string().min(10).max(300),
+  forecastWindow: z.string().min(5).max(180),
+  summary: z.string().min(20).max(1000),
+  evidence: z.array(maintenanceEvidenceSchema).min(2).max(5),
+  actions: z.array(z.object({
+    priority: z.enum(["Now", "7 days", "30 days"]),
+    action: z.string().min(10).max(500),
+    owner: z.string().min(2).max(120),
+    timing: z.string().min(2).max(160)
+  })).min(1).max(5),
+  energyImpact: z.object({
+    excessKwhPerDay: z.number().min(0),
+    costPerMonth: z.number().min(0),
+    annualEmissionsTonnes: z.number().min(0),
+    narrative: z.string().min(10).max(400)
+  }),
+  workOrder: z.object({
+    created: z.boolean(),
+    reference: z.string().max(80),
+    title: z.string().max(200),
+    status: z.string().max(120)
+  }),
+  assumptions: z.array(z.string().min(5).max(300)).min(1).max(5)
+});
+
+export const esgRequestSchema = z.object({
+  mode: modeSchema,
+  settings: z.object({
+    scope: z.string().min(1).max(80),
+    reportingPeriod: z.literal("FY2026 · 1 July 2025–30 June 2026"),
+    framework: z.enum(["GRESB review draft", "NABERS evidence pack", "Internal net-zero review"]),
+    focus: z.enum(["Balanced portfolio", "Carbon & energy", "Resource efficiency"])
+  })
+});
+
+const esgMetricSchema = z.object({
+  key: z.string().min(1).max(80),
+  label: z.string().min(2).max(120),
+  value: z.number(),
+  unit: z.string().min(1).max(40),
+  changePercent: z.number(),
+  target: z.string().min(1).max(100),
+  status: z.enum(["On track", "Watch", "Off track"]),
+  commentary: z.string().min(10).max(400)
+});
+
+const esgBuildingSchema = z.object({
+  buildingId: z.string().min(1),
+  name: z.string().min(2).max(120),
+  energyIntensity: z.number().min(0),
+  carbonIntensity: z.number().min(0),
+  waterIntensity: z.number().min(0),
+  dataCompleteness: z.number().min(0).max(100),
+  status: z.enum(["On track", "Watch", "Off track"]),
+  insight: z.string().min(10).max(400)
+});
+
+export const esgOutputSchema = z.object({
+  scope: z.string().min(2).max(120),
+  reportingPeriod: z.string().min(2).max(120),
+  framework: z.string().min(2).max(120),
+  assuranceStatus: z.enum(["Draft", "Review ready", "Data gaps"]),
+  executiveSummary: z.string().min(30).max(1400),
+  metrics: z.array(esgMetricSchema).min(4).max(8),
+  buildings: z.array(esgBuildingSchema).min(1).max(3),
+  disclosures: z.array(z.object({
+    topic: z.string().min(2).max(120),
+    status: z.enum(["Ready", "Partial", "Gap"]),
+    summary: z.string().min(10).max(500),
+    evidence: z.string().min(2).max(300),
+    gap: z.string().max(300)
+  })).min(3).max(6),
+  actions: z.array(z.object({
+    priority: z.enum(["High", "Medium", "Low"]),
+    action: z.string().min(10).max(500),
+    owner: z.string().min(2).max(120),
+    dueDate: z.string().min(2).max(100),
+    impact: z.string().min(5).max(300)
+  })).min(2).max(6),
+  methodology: z.string().min(10).max(600),
+  caveats: z.array(z.string().min(5).max(300)).min(2).max(6)
+});
+
 export const matchJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -386,5 +487,164 @@ export const assistantJsonSchema = {
       }
     },
     suggestions: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 3 }
+  }
+};
+
+export const maintenanceJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["healthScore", "failureRisk", "confidence", "predictedIssue", "forecastWindow", "summary", "evidence", "actions", "energyImpact", "workOrder", "assumptions"],
+  properties: {
+    healthScore: { type: "integer", minimum: 0, maximum: 100 },
+    failureRisk: { type: "string", enum: ["Low", "Moderate", "High", "Critical"] },
+    confidence: { type: "integer", minimum: 0, maximum: 100 },
+    predictedIssue: { type: "string" },
+    forecastWindow: { type: "string" },
+    summary: { type: "string" },
+    evidence: {
+      type: "array",
+      minItems: 2,
+      maxItems: 5,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["signalId", "label", "reading", "severity", "interpretation"],
+        properties: {
+          signalId: { type: "string" },
+          label: { type: "string" },
+          reading: { type: "string" },
+          severity: { type: "string", enum: ["Normal", "Watch", "Elevated", "Critical"] },
+          interpretation: { type: "string" }
+        }
+      }
+    },
+    actions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 5,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["priority", "action", "owner", "timing"],
+        properties: {
+          priority: { type: "string", enum: ["Now", "7 days", "30 days"] },
+          action: { type: "string" },
+          owner: { type: "string" },
+          timing: { type: "string" }
+        }
+      }
+    },
+    energyImpact: {
+      type: "object",
+      additionalProperties: false,
+      required: ["excessKwhPerDay", "costPerMonth", "annualEmissionsTonnes", "narrative"],
+      properties: {
+        excessKwhPerDay: { type: "number", minimum: 0 },
+        costPerMonth: { type: "number", minimum: 0 },
+        annualEmissionsTonnes: { type: "number", minimum: 0 },
+        narrative: { type: "string" }
+      }
+    },
+    workOrder: {
+      type: "object",
+      additionalProperties: false,
+      required: ["created", "reference", "title", "status"],
+      properties: {
+        created: { type: "boolean" },
+        reference: { type: "string" },
+        title: { type: "string" },
+        status: { type: "string" }
+      }
+    },
+    assumptions: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 }
+  }
+};
+
+export const esgJsonSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["scope", "reportingPeriod", "framework", "assuranceStatus", "executiveSummary", "metrics", "buildings", "disclosures", "actions", "methodology", "caveats"],
+  properties: {
+    scope: { type: "string" },
+    reportingPeriod: { type: "string" },
+    framework: { type: "string" },
+    assuranceStatus: { type: "string", enum: ["Draft", "Review ready", "Data gaps"] },
+    executiveSummary: { type: "string" },
+    metrics: {
+      type: "array",
+      minItems: 4,
+      maxItems: 8,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["key", "label", "value", "unit", "changePercent", "target", "status", "commentary"],
+        properties: {
+          key: { type: "string" },
+          label: { type: "string" },
+          value: { type: "number" },
+          unit: { type: "string" },
+          changePercent: { type: "number" },
+          target: { type: "string" },
+          status: { type: "string", enum: ["On track", "Watch", "Off track"] },
+          commentary: { type: "string" }
+        }
+      }
+    },
+    buildings: {
+      type: "array",
+      minItems: 1,
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["buildingId", "name", "energyIntensity", "carbonIntensity", "waterIntensity", "dataCompleteness", "status", "insight"],
+        properties: {
+          buildingId: { type: "string" },
+          name: { type: "string" },
+          energyIntensity: { type: "number" },
+          carbonIntensity: { type: "number" },
+          waterIntensity: { type: "number" },
+          dataCompleteness: { type: "number", minimum: 0, maximum: 100 },
+          status: { type: "string", enum: ["On track", "Watch", "Off track"] },
+          insight: { type: "string" }
+        }
+      }
+    },
+    disclosures: {
+      type: "array",
+      minItems: 3,
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["topic", "status", "summary", "evidence", "gap"],
+        properties: {
+          topic: { type: "string" },
+          status: { type: "string", enum: ["Ready", "Partial", "Gap"] },
+          summary: { type: "string" },
+          evidence: { type: "string" },
+          gap: { type: "string" }
+        }
+      }
+    },
+    actions: {
+      type: "array",
+      minItems: 2,
+      maxItems: 6,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["priority", "action", "owner", "dueDate", "impact"],
+        properties: {
+          priority: { type: "string", enum: ["High", "Medium", "Low"] },
+          action: { type: "string" },
+          owner: { type: "string" },
+          dueDate: { type: "string" },
+          impact: { type: "string" }
+        }
+      }
+    },
+    methodology: { type: "string" },
+    caveats: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 6 }
   }
 };

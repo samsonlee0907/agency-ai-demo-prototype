@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groundValuationComparables, ModelResponseError } from "../src/providers/gpt.js";
+import { findMaintenanceAsset } from "../src/operations-data.js";
+import { analyseMaintenance, buildEsgEvidence } from "../src/mock-services.js";
+import { groundEsgReport, groundMaintenanceAnalysis, groundValuationComparables, ModelResponseError } from "../src/providers/gpt.js";
 
 const sources = [
   { id: "comp-one", address: "1 Sample Street", area: "Sydney", saleDate: "1 Jul 2026", salePrice: 1000000 },
@@ -37,6 +39,62 @@ test("valuation grounding rejects duplicate comparable IDs", () => {
       { comparables: [comparable("comp-one"), comparable("comp-one"), comparable("comp-two")] },
       sources
     ),
+    ModelResponseError
+  );
+});
+
+test("maintenance grounding restores source readings and rejects invented signal IDs", () => {
+  const asset = findMaintenanceAsset("asset-meridian-chiller-02");
+  const baseline = analyseMaintenance(asset.id, 30);
+  const result = {
+    healthScore: 99,
+    failureRisk: "Low",
+    confidence: 1,
+    predictedIssue: "Fabricated",
+    forecastWindow: "Fabricated",
+    evidence: asset.signals.map((signal) => ({
+      signalId: signal.id,
+      label: "Fabricated",
+      reading: "Fabricated",
+      severity: "Elevated",
+      interpretation: "A grounded interpretation of the supplied trend."
+    })),
+    energyImpact: { excessKwhPerDay: 1, costPerMonth: 1, annualEmissionsTonnes: 1, narrative: "Grounded source impact narrative." }
+  };
+  const grounded = groundMaintenanceAnalysis(result, asset, baseline);
+  assert.equal(grounded.evidence[0].reading, "6.8 mm/s RMS");
+  assert.equal(grounded.energyImpact.excessKwhPerDay, 186);
+  assert.equal(grounded.confidence, 97);
+  assert.equal(grounded.failureRisk, "High");
+  assert.throws(
+    () => groundMaintenanceAnalysis({ ...result, evidence: [{ ...result.evidence[0], signalId: "invented" }, ...result.evidence.slice(1)] }, asset, baseline),
+    ModelResponseError
+  );
+});
+
+test("ESG grounding restores calculated metrics and requires the complete evidence set", () => {
+  const evidence = buildEsgEvidence({
+    scope: "portfolio",
+    reportingPeriod: "FY2026",
+    framework: "GRESB review draft",
+    focus: "Balanced portfolio"
+  });
+  const result = {
+    scope: "Fabricated",
+    reportingPeriod: "Fabricated",
+    framework: "Fabricated",
+    assuranceStatus: "Review ready",
+    metrics: evidence.metrics.map((metric) => ({ ...metric, value: 999, commentary: "A grounded interpretation of this calculated metric." })),
+    buildings: evidence.buildings.map((building) => ({ ...building, energyIntensity: 999, insight: "A grounded building performance interpretation." })),
+    disclosures: evidence.disclosures.map((disclosure) => ({ ...disclosure, summary: "A grounded disclosure readiness interpretation." })),
+    methodology: "Fabricated"
+  };
+  const grounded = groundEsgReport(result, evidence);
+  assert.equal(grounded.metrics[0].value, evidence.metrics[0].value);
+  assert.equal(grounded.buildings[0].energyIntensity, evidence.buildings[0].energyIntensity);
+  assert.equal(grounded.assuranceStatus, "Draft");
+  assert.throws(
+    () => groundEsgReport({ ...result, metrics: result.metrics.slice(1) }, evidence),
     ModelResponseError
   );
 });

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { findBuilding } from "../src/data.js";
-import { abstractLease, answerTenant, draftValuation, generateMarketing, matchProperties, qualifyLead } from "../src/mock-services.js";
+import { abstractLease, analyseMaintenance, answerTenant, buildEsgEvidence, createEsgReport, draftValuation, generateMarketing, matchProperties, qualifyLead } from "../src/mock-services.js";
 
 const brief = {
   location: "Double Bay",
@@ -102,4 +102,92 @@ test("maintenance timing is not invented for buildings without an SLA", () => {
   const hvac = answerTenant("building-arcade", "The air conditioning is hot");
   assert.equal(leak.workOrder.nextUpdate, "Facilities will confirm attendance timing");
   assert.equal(hvac.workOrder.nextUpdate, "Facilities will confirm attendance timing");
+});
+
+test("predictive maintenance analysis is deterministic and grounded in source signals", () => {
+  const first = analyseMaintenance("asset-meridian-chiller-02", 30);
+  const second = analyseMaintenance("asset-meridian-chiller-02", 30);
+  assert.deepEqual(first, second);
+  assert.equal(first.failureRisk, "High");
+  assert.equal(first.workOrder.created, true);
+  assert.deepEqual(first.evidence.map((item) => item.signalId), [
+    "compressor-vibration",
+    "condenser-approach",
+    "power-draw"
+  ]);
+  assert.equal(first.energyImpact.excessKwhPerDay, 186);
+});
+
+test("healthy monitored equipment does not create a reactive work order", () => {
+  const result = analyseMaintenance("asset-meridian-lift-03", 90);
+  assert.equal(result.failureRisk, "Low");
+  assert.equal(result.workOrder.created, false);
+  assert.ok(result.healthScore > 80);
+});
+
+test("critical multi-signal telemetry produces a reachable critical risk state", () => {
+  const result = analyseMaintenance("asset-southbank-dock-07", 7);
+  assert.equal(result.failureRisk, "Critical");
+  assert.ok(result.healthScore <= 32);
+  assert.ok(result.evidence.filter((item) => item.severity === "Critical").length >= 2);
+});
+
+test("configured warning limits drive severity and horizon changes forecast risk", () => {
+  const arcade = analyseMaintenance("asset-arcade-ahu-03", 30);
+  const shortHorizon = analyseMaintenance("asset-meridian-chiller-02", 7);
+  const standardHorizon = analyseMaintenance("asset-meridian-chiller-02", 30);
+  assert.equal(arcade.evidence.find((item) => item.signalId === "filter-pressure").severity, "Elevated");
+  assert.equal(shortHorizon.failureRisk, "Moderate");
+  assert.equal(standardHorizon.failureRisk, "High");
+  assert.match(shortHorizon.forecastWindow, /not forecast inside the next 7 days/i);
+});
+
+test("ESG evidence calculates stable portfolio metrics from source records", () => {
+  const settings = {
+    scope: "portfolio",
+    reportingPeriod: "FY2026 · 1 July 2025–30 June 2026",
+    framework: "GRESB review draft",
+    focus: "Balanced portfolio"
+  };
+  const evidence = buildEsgEvidence(settings);
+  const report = createEsgReport(settings);
+  assert.equal(evidence.buildings.length, 3);
+  assert.equal(evidence.metrics.length, 6);
+  assert.deepEqual(report.metrics.map((metric) => metric.value), evidence.metrics.map((metric) => metric.value));
+  assert.equal(report.assuranceStatus, "Draft");
+  assert.match(report.caveats.join(" "), /fictional/i);
+});
+
+test("single-building ESG evidence excludes unrelated portfolio gaps", () => {
+  const settings = {
+    scope: "building-meridian",
+    reportingPeriod: "FY2026 · 1 July 2025–30 June 2026",
+    framework: "Internal net-zero review",
+    focus: "Resource efficiency"
+  };
+  const evidence = buildEsgEvidence(settings);
+  const report = createEsgReport(settings);
+  const water = evidence.disclosures.find((item) => item.topic === "Water stewardship");
+  const energy = evidence.disclosures.find((item) => item.topic === "Energy and emissions");
+  assert.equal(evidence.buildings.length, 1);
+  assert.equal(water.status, "Ready");
+  assert.equal(water.gap, "");
+  assert.match(energy.evidence, /Meridian House/);
+  assert.doesNotMatch(JSON.stringify(evidence.disclosures), /all three assets/i);
+  assert.doesNotMatch(JSON.stringify(report.actions), /industrial water-submeter/i);
+  assert.doesNotMatch(report.executiveSummary, /water stewardship records require confirmation/i);
+  assert.ok(evidence.metrics.slice(2).every((metric) => metric.changePercent !== 0));
+});
+
+test("ESG report priorities respond to the selected review focus", () => {
+  const base = {
+    scope: "portfolio",
+    reportingPeriod: "FY2026 · 1 July 2025–30 June 2026",
+    framework: "GRESB review draft"
+  };
+  const carbon = createEsgReport({ ...base, focus: "Carbon & energy" });
+  const resources = createEsgReport({ ...base, focus: "Resource efficiency" });
+  assert.notEqual(carbon.actions[0].action, resources.actions[0].action);
+  assert.match(carbon.executiveSummary, /plant efficiency/i);
+  assert.match(resources.executiveSummary, /water, waste/i);
 });

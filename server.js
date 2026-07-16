@@ -6,17 +6,20 @@ import { fileURLToPath } from "node:url";
 import { ZodError } from "zod";
 import { getConfig, publicStatus } from "./src/config.js";
 import { buildingProfiles, comparableSales, findBuilding, findLead, findLease, findListing, leads, leaseDocuments, listings } from "./src/data.js";
-import { abstractLease, answerTenant, draftValuation, generateMarketing, getMockImage, matchProperties, qualifyLead } from "./src/mock-services.js";
+import { abstractLease, analyseMaintenance, answerTenant, buildEsgEvidence, createEsgReport, draftValuation, generateMarketing, getMockImage, matchProperties, qualifyLead } from "./src/mock-services.js";
+import { esgPortfolio, findMaintenanceAsset, maintenanceAssets } from "./src/operations-data.js";
 import { createGptProvider, ModelResponseError } from "./src/providers/gpt.js";
 import { createMaiImageProvider } from "./src/providers/mai-image.js";
 import { createCampaignEditPrompt } from "./src/property-image-prompts.js";
 import { saveSettings, settingsToEnv } from "./src/settings-store.js";
 import {
   assistantRequestSchema,
+  esgRequestSchema,
   imageRequestSchema,
   leaseRequestSchema,
   marketingRequestSchema,
   matchRequestSchema,
+  maintenanceRequestSchema,
   qualificationRequestSchema,
   settingsRequestSchema,
   valuationRequestSchema
@@ -42,6 +45,16 @@ function resolveBuilding(id) {
     throw error;
   }
   return building;
+}
+
+function resolveMaintenanceAsset(id) {
+  const asset = findMaintenanceAsset(id);
+  if (!asset) {
+    const error = new Error("Maintenance asset not found.");
+    error.status = 404;
+    throw error;
+  }
+  return asset;
 }
 
 applyConfig();
@@ -175,7 +188,7 @@ app.put("/api/settings", requireLocalRequest, async (request, response, next) =>
 });
 
 app.get("/api/bootstrap", (_request, response) => {
-  response.json({ listings, leads, leaseDocuments, buildingProfiles });
+  response.json({ listings, leads, leaseDocuments, buildingProfiles, maintenanceAssets, esgPortfolio });
 });
 
 app.post("/api/match", async (request, response, next) => {
@@ -256,6 +269,33 @@ app.post("/api/lease", async (request, response, next) => {
       ? await requireLiveProvider(runtime.gpt, "GPT-5.4").abstractLease(lease)
       : abstractLease(leaseId);
     response.json({ mode, leaseId, ...output });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/maintenance", async (request, response, next) => {
+  try {
+    const { mode, assetId, horizon } = maintenanceRequestSchema.parse(request.body);
+    const asset = resolveMaintenanceAsset(assetId);
+    const baseline = analyseMaintenance(assetId, horizon);
+    const output = mode === "live"
+      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").analyseMaintenance(asset, horizon, baseline)
+      : baseline;
+    response.json({ mode, assetId, ...output });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/esg", async (request, response, next) => {
+  try {
+    const { mode, settings } = esgRequestSchema.parse(request.body);
+    const evidence = buildEsgEvidence(settings);
+    const output = mode === "live"
+      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").draftEsgReport(settings, evidence)
+      : createEsgReport(settings);
+    response.json({ mode, ...output });
   } catch (error) {
     next(error);
   }

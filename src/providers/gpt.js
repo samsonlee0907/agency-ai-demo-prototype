@@ -3,8 +3,12 @@ import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity"
 import {
   assistantJsonSchema,
   assistantOutputSchema,
+  esgJsonSchema,
+  esgOutputSchema,
   matchJsonSchema,
   matchOutputSchema,
+  maintenanceJsonSchema,
+  maintenanceOutputSchema,
   marketingJsonSchema,
   marketingOutputSchema,
   leaseJsonSchema,
@@ -36,7 +40,9 @@ function parseJsonOutput(text, schema) {
 
   const validated = schema.safeParse(parsed);
   if (!validated.success) {
-    throw new ModelResponseError(`GPT response failed validation: ${validated.error.issues[0]?.message || "invalid shape"}`);
+    const issue = validated.error.issues[0];
+    const location = issue?.path?.length ? ` at ${issue.path.join(".")}` : "";
+    throw new ModelResponseError(`GPT response failed validation${location}: ${issue?.message || "invalid shape"}`);
   }
   return validated.data;
 }
@@ -61,6 +67,71 @@ export function groundValuationComparables(result, comparables) {
   };
 }
 
+export function groundMaintenanceAnalysis(result, asset, baseline) {
+    const signals = new Map(asset.signals.map((signal) => [signal.id, signal]));
+    const ids = result.evidence.map((item) => item.signalId);
+    if (ids.length !== signals.size || ids.some((id) => !signals.has(id)) || new Set(ids).size !== ids.length) {
+      throw new ModelResponseError("GPT returned an incomplete, unknown or duplicate maintenance signal identifier.");
+    }
+    const baselineEvidence = new Map(baseline.evidence.map((item) => [item.signalId, item]));
+    return {
+      ...result,
+      healthScore: baseline.healthScore,
+      failureRisk: baseline.failureRisk,
+      confidence: baseline.confidence,
+      predictedIssue: baseline.predictedIssue,
+      forecastWindow: baseline.forecastWindow,
+      evidence: result.evidence.map((item) => {
+        const source = baselineEvidence.get(item.signalId);
+        return {
+          ...item,
+          label: source.label,
+          reading: source.reading,
+          severity: source.severity
+        };
+      }),
+      energyImpact: {
+        ...baseline.energyImpact,
+        narrative: result.energyImpact.narrative
+      },
+      actions: baseline.actions,
+      workOrder: baseline.workOrder
+    };
+  }
+
+export function groundEsgReport(result, evidence) {
+    const metrics = new Map(evidence.metrics.map((metric) => [metric.key, metric]));
+    const metricIds = result.metrics.map((metric) => metric.key);
+    const buildings = new Map(evidence.buildings.map((building) => [building.buildingId, building]));
+    const buildingIds = result.buildings.map((building) => building.buildingId);
+    const disclosures = new Map(evidence.disclosures.map((disclosure) => [disclosure.topic, disclosure]));
+    const disclosureIds = result.disclosures.map((disclosure) => disclosure.topic);
+    const exactSet = (actual, expected) => actual.length === expected.size
+      && new Set(actual).size === actual.length
+      && actual.every((id) => expected.has(id));
+
+    if (!exactSet(metricIds, metrics) || !exactSet(buildingIds, buildings) || !exactSet(disclosureIds, disclosures)) {
+      throw new ModelResponseError("GPT returned incomplete, unknown or duplicate ESG evidence identifiers.");
+    }
+
+    const hasGap = evidence.disclosures.some((item) => item.status === "Gap");
+    const hasPartial = evidence.disclosures.some((item) => item.status === "Partial");
+    return {
+      ...result,
+      scope: evidence.scope,
+      reportingPeriod: evidence.reportingPeriod,
+      framework: evidence.framework,
+      assuranceStatus: hasGap ? "Data gaps" : hasPartial ? "Draft" : "Review ready",
+      metrics: result.metrics.map((metric) => ({ ...metric, ...metrics.get(metric.key), commentary: metric.commentary })),
+      buildings: result.buildings.map((building) => ({ ...building, ...buildings.get(building.buildingId), insight: building.insight })),
+      disclosures: result.disclosures.map((disclosure) => ({
+        ...disclosure,
+        ...disclosures.get(disclosure.topic),
+        summary: disclosure.summary
+      })),
+      methodology: evidence.methodology
+    };
+  }
 export function createGptProvider(config) {
   if (!config.configured) return null;
 
@@ -177,6 +248,26 @@ export function createGptProvider(config) {
         throw new ModelResponseError("GPT emergency guidance did not direct the tenant to emergency services.");
       }
       return result;
+    },
+    async analyseMaintenance(asset, horizon, baseline) {
+      const result = await generateStructured({
+        name: "predictive_maintenance_analysis",
+        instructions: "You are a facilities condition-monitoring copilot. Diagnose only from the supplied fictional asset metadata and telemetry. Distinguish observed signals from predicted risk, explain uncertainty, prioritise safe technician verification, and never claim the language model itself measured the equipment. Use only supplied signal IDs and do not invent readings, costs or emissions.",
+        input: { asset, horizonDays: horizon, analysisDate: "16 July 2026" },
+        jsonSchema: maintenanceJsonSchema,
+        outputSchema: maintenanceOutputSchema
+      });
+      return groundMaintenanceAnalysis(result, asset, baseline);
+    },
+    async draftEsgReport(settings, evidence) {
+      const result = await generateStructured({
+        name: "esg_sustainability_draft",
+        instructions: "You are a property-portfolio sustainability reporting copilot. Produce a concise management review draft grounded only in the calculated fictional evidence supplied. Preserve all metric keys, building IDs and disclosure topics exactly once. Do not claim certification, regulatory compliance or external assurance. Flag partial evidence candidly and recommend practical owners and actions.",
+        input: { settings, evidence, reportDate: "16 July 2026" },
+        jsonSchema: esgJsonSchema,
+        outputSchema: esgOutputSchema
+      });
+      return groundEsgReport(result, evidence);
     }
   };
 }

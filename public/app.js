@@ -5,8 +5,12 @@ const state = {
   leads: [],
   leases: [],
   buildings: [],
+  maintenanceAssets: [],
+  esgPortfolio: null,
   assistantHistory: [],
   assistantPending: false,
+  maintenanceRequestId: 0,
+  esgRequestId: 0,
   selectedLeadId: null,
   marketing: null
 };
@@ -14,6 +18,7 @@ const state = {
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const money = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 });
+const decimal = new Intl.NumberFormat("en-AU", { maximumFractionDigits: 1 });
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -41,6 +46,17 @@ function loadingMarkup(message) {
 
 function errorMarkup(error) {
   return `<div class="error-state" role="alert"><strong>Unable to complete this request.</strong><br>${escapeHtml(error.message)}</div>`;
+}
+
+function inputsChangedMarkup(subject) {
+  return `<div class="preview-placeholder" aria-live="polite"><p class="eyebrow">Inputs changed</p><h3>${escapeHtml(subject)} is ready to refresh.</h3><p>Run the analysis again to use the current settings.</p></div>`;
+}
+
+function invalidateGeneratedOutput(selector, subject) {
+  const output = $(selector);
+  if (output?.querySelector(".loading-state, .maintenance-report, .esg-report")) {
+    output.innerHTML = inputsChangedMarkup(subject);
+  }
 }
 
 function setButtonLoading(button, loading, label) {
@@ -78,6 +94,10 @@ function updateMode(mode) {
     return;
   }
   state.mode = mode;
+  state.maintenanceRequestId += 1;
+  state.esgRequestId += 1;
+  invalidateGeneratedOutput("#maintenance-output", "Condition analysis");
+  invalidateGeneratedOutput("#esg-output", "Sustainability draft");
   $$(".mode-option").forEach((button) => button.classList.toggle("is-active", button.dataset.mode === mode));
   $("#status-label").textContent = mode === "live" ? "Live Foundry" : "Mock data";
   $(".status-dot").style.background = mode === "live" ? "var(--success)" : "var(--gold)";
@@ -319,6 +339,77 @@ function renderAssistantMessages() {
     `;
   }).join("");
   container.scrollTop = container.scrollHeight;
+}
+
+function maintenanceAssetById(id) {
+  return state.maintenanceAssets.find((asset) => asset.id === id);
+}
+
+function sparklinePoints(values, width = 300, height = 86) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  return values.map((value, index) => {
+    const x = index * width / (values.length - 1);
+    const y = height - ((value - min) / range) * (height - 12) - 6;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+}
+
+function renderMaintenanceAssetSelect() {
+  $("#maintenance-asset").innerHTML = state.maintenanceAssets
+    .map((asset) => `<option value="${escapeHtml(asset.id)}">${escapeHtml(asset.buildingName)} · ${escapeHtml(asset.name)}</option>`)
+    .join("");
+  renderMaintenanceAssetProfile();
+}
+
+function renderMaintenanceAssetProfile() {
+  state.maintenanceRequestId += 1;
+  const asset = maintenanceAssetById($("#maintenance-asset").value);
+  if (!asset) return;
+  const latest = asset.trend.at(-1);
+  $("#maintenance-asset-profile").innerHTML = `
+    <div class="asset-profile-head">
+      <div><p class="eyebrow">${escapeHtml(asset.system)}</p><h4>${escapeHtml(asset.name)}</h4><span>${escapeHtml(asset.buildingName)} · ${escapeHtml(asset.location)}</span></div>
+      <i>${escapeHtml(asset.criticality)}</i>
+    </div>
+    <div class="asset-trend">
+      <div><span>Latest condition trend</span><strong>${escapeHtml(latest)} <small>${escapeHtml(asset.trendUnit)}</small></strong></div>
+      <svg viewBox="0 0 300 86" role="img" aria-label="${escapeHtml(asset.trendUnit)} trend"><path d="M0 80H300"/><polyline points="${sparklinePoints(asset.trend)}"/></svg>
+    </div>
+    <dl>
+      <div><dt>Last service</dt><dd>${escapeHtml(asset.lastService)}</dd></div>
+      <div><dt>Data coverage</dt><dd>${asset.dataCompleteness}%</dd></div>
+      <div><dt>Operating hours</dt><dd>${asset.operatingHours.toLocaleString("en-AU")}</dd></div>
+    </dl>
+  `;
+}
+
+function renderEsgScopeSelect() {
+  $("#esg-scope").innerHTML = [
+    '<option value="portfolio">Aurelia managed portfolio</option>',
+    ...state.esgPortfolio.buildings.map((building) => `<option value="${escapeHtml(building.buildingId)}">${escapeHtml(building.name)} · ${escapeHtml(building.type)}</option>`)
+  ].join("");
+  renderEsgSourceOverview();
+}
+
+function renderEsgSourceOverview() {
+  state.esgRequestId += 1;
+  const scope = $("#esg-scope").value;
+  const buildings = scope === "portfolio"
+    ? state.esgPortfolio.buildings
+    : state.esgPortfolio.buildings.filter((building) => building.buildingId === scope);
+  const floorArea = buildings.reduce((sum, building) => sum + building.floorAreaSqm, 0);
+  const completeness = decimal.format(buildings.reduce((sum, building) => sum + building.dataCompleteness * building.floorAreaSqm, 0) / floorArea);
+  $("#esg-source-overview").innerHTML = `
+    <p class="eyebrow">Evidence connected</p>
+    <h4>${buildings.length} managed ${buildings.length === 1 ? "asset" : "assets"}</h4>
+    <div class="esg-evidence-counts">
+      <span><strong>12</strong> meter periods</span>
+      <span><strong>${completeness}%</strong> data complete</span>
+      <span><strong>${state.esgPortfolio.disclosures.length}</strong> disclosure topics</span>
+    </div>
+  `;
 }
 
 function renderLeadList() {
@@ -689,6 +780,184 @@ async function submitAssistantMessage(event) {
   }
 }
 
+async function submitMaintenance(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = $('button[type="submit"]', form);
+  const { assetId, horizon } = Object.fromEntries(new FormData(form));
+  const requestId = ++state.maintenanceRequestId;
+  const output = $("#maintenance-output");
+  output.dataset.requestId = String(requestId);
+  $("#maintenance-asset").disabled = true;
+  setButtonLoading(button, true, "Reading condition signals…");
+  output.innerHTML = loadingMarkup("Reconciling telemetry, failure risk and energy impact…");
+
+  try {
+    const result = await api("/api/maintenance", {
+      method: "POST",
+      body: JSON.stringify({ mode: state.mode, assetId, horizon })
+    });
+    if (requestId !== state.maintenanceRequestId || $("#maintenance-asset").value !== assetId) return;
+    renderMaintenanceAnalysis(result);
+  } catch (error) {
+    if (requestId === state.maintenanceRequestId) output.innerHTML = errorMarkup(error);
+  } finally {
+    if (requestId !== state.maintenanceRequestId && output.dataset.requestId === String(requestId) && output.querySelector(".loading-state")) {
+      output.innerHTML = inputsChangedMarkup("Condition analysis");
+    }
+    $("#maintenance-asset").disabled = false;
+    setButtonLoading(button, false);
+  }
+}
+
+function renderMaintenanceAnalysis(result) {
+  const asset = maintenanceAssetById(result.assetId);
+  const riskClass = result.failureRisk.toLowerCase();
+  $("#maintenance-output").innerHTML = `
+    <article class="maintenance-report">
+      <header class="operations-report-head">
+        <div><p class="eyebrow">Condition analysis · ${escapeHtml(asset.buildingName)}</p><h3>${escapeHtml(asset.name)}</h3><p>${escapeHtml(asset.system)} · ${escapeHtml(asset.location)}</p></div>
+        <span class="risk-badge risk-${riskClass}">${escapeHtml(result.failureRisk)} failure risk</span>
+      </header>
+      <div class="condition-overview">
+        <div class="health-gauge" style="--health:${result.healthScore}">
+          <div><strong>${result.healthScore}</strong><span>Asset health</span></div>
+        </div>
+        <div class="condition-conclusion">
+          <p class="eyebrow">Predicted issue</p>
+          <h4>${escapeHtml(result.predictedIssue)}</h4>
+          <span>${escapeHtml(result.forecastWindow)} · ${result.confidence}% confidence</span>
+          <p>${escapeHtml(result.summary)}</p>
+        </div>
+      </div>
+      <section class="report-section">
+        <div class="report-section-head"><div><p class="eyebrow">Explainable evidence</p><h4>Signals behind the risk</h4></div><span>${result.evidence.length} correlated readings</span></div>
+        <div class="signal-grid">
+          ${result.evidence.map((item) => `
+            <article class="signal-card signal-${item.severity.toLowerCase()}">
+              <div><span>${escapeHtml(item.label)}</span><i>${escapeHtml(item.severity)}</i></div>
+              <strong>${escapeHtml(item.reading)}</strong>
+              <p>${escapeHtml(item.interpretation)}</p>
+            </article>
+          `).join("")}
+        </div>
+      </section>
+      <section class="energy-impact">
+        <div><span>Excess demand</span><strong>${decimal.format(result.energyImpact.excessKwhPerDay)} kWh/day</strong></div>
+        <div><span>Estimated cost</span><strong>${money.format(result.energyImpact.costPerMonth)}/month</strong></div>
+        <div><span>Annual emissions</span><strong>${decimal.format(result.energyImpact.annualEmissionsTonnes)} tCO₂e</strong></div>
+        <p>${escapeHtml(result.energyImpact.narrative)}</p>
+      </section>
+      <section class="report-section">
+        <div class="report-section-head"><div><p class="eyebrow">Intervention plan</p><h4>Recommended actions</h4></div></div>
+        <div class="action-timeline">
+          ${result.actions.map((item, index) => `
+            <article><span>${String(index + 1).padStart(2, "0")}</span><div><i>${escapeHtml(item.priority)}</i><strong>${escapeHtml(item.action)}</strong><small>${escapeHtml(item.owner)} · ${escapeHtml(item.timing)}</small></div></article>
+          `).join("")}
+        </div>
+      </section>
+      <div class="condition-work-order ${result.workOrder.created ? "is-created" : ""}">
+        <span>${result.workOrder.created ? "Draft work order" : "Maintenance status"}</span>
+        <strong>${escapeHtml(result.workOrder.reference || result.workOrder.title)}</strong>
+        <p>${escapeHtml(result.workOrder.title)} · ${escapeHtml(result.workOrder.status)}</p>
+      </div>
+      <footer class="report-signoff"><strong>Human verification required</strong><span>${result.assumptions.map(escapeHtml).join(" ")}</span></footer>
+    </article>
+  `;
+}
+
+async function submitEsg(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = $('button[type="submit"]', form);
+  const settings = Object.fromEntries(new FormData(form));
+  const requestId = ++state.esgRequestId;
+  const output = $("#esg-output");
+  output.dataset.requestId = String(requestId);
+  $("#esg-scope").disabled = true;
+  setButtonLoading(button, true, "Assembling the evidence…");
+  output.innerHTML = loadingMarkup("Calculating portfolio metrics and drafting the management review…");
+
+  try {
+    const result = await api("/api/esg", {
+      method: "POST",
+      body: JSON.stringify({ mode: state.mode, settings })
+    });
+    if (requestId !== state.esgRequestId || $("#esg-scope").value !== settings.scope) return;
+    renderEsgReport(result);
+  } catch (error) {
+    if (requestId === state.esgRequestId) output.innerHTML = errorMarkup(error);
+  } finally {
+    if (requestId !== state.esgRequestId && output.dataset.requestId === String(requestId) && output.querySelector(".loading-state")) {
+      output.innerHTML = inputsChangedMarkup("Sustainability draft");
+    }
+    $("#esg-scope").disabled = false;
+    setButtonLoading(button, false);
+  }
+}
+
+function renderEsgReport(result) {
+  $("#esg-output").innerHTML = `
+    <article class="esg-report">
+      <header class="operations-report-head">
+        <div><p class="eyebrow">${escapeHtml(result.framework)}</p><h3>${escapeHtml(result.scope)}</h3><p>${escapeHtml(result.reportingPeriod)}</p></div>
+        <span class="assurance-badge assurance-${result.assuranceStatus.toLowerCase().replace(/\s/g, "-")}">${escapeHtml(result.assuranceStatus)}</span>
+      </header>
+      <p class="esg-summary">${escapeHtml(result.executiveSummary)}</p>
+      <section class="esg-metric-grid" aria-label="Sustainability metrics">
+        ${result.metrics.map((metric) => `
+          <article class="esg-metric status-${metric.status.toLowerCase().replace(/\s/g, "-")}">
+            <span>${escapeHtml(metric.label)}</span>
+            <strong>${decimal.format(metric.value)} <small>${escapeHtml(metric.unit)}</small></strong>
+            <div><i>${metric.changePercent > 0 ? "↑" : "↓"} ${decimal.format(Math.abs(metric.changePercent))}% YoY</i><b>${escapeHtml(metric.status)}</b></div>
+            <p>${escapeHtml(metric.commentary)}</p>
+            <small>Target · ${escapeHtml(metric.target)}</small>
+          </article>
+        `).join("")}
+      </section>
+      <section class="report-section">
+        <div class="report-section-head"><div><p class="eyebrow">Asset view</p><h4>Performance by building</h4></div><span>Calculated from source records</span></div>
+        <div class="esg-table-scroll">
+          <table class="esg-table">
+            <caption class="sr-only">Building sustainability performance</caption>
+            <thead><tr><th scope="col">Managed asset</th><th scope="col">Energy</th><th scope="col">Carbon</th><th scope="col">Water</th><th scope="col">Evidence</th></tr></thead>
+            <tbody>${result.buildings.map((building) => `
+              <tr>
+                <th scope="row"><strong>${escapeHtml(building.name)}</strong><small>${escapeHtml(building.insight)}</small></th>
+                <td>${decimal.format(building.energyIntensity)} kWh/m²</td>
+                <td>${decimal.format(building.carbonIntensity)} kgCO₂e/m²</td>
+                <td>${decimal.format(building.waterIntensity)} kL/m²</td>
+                <td><b class="status-text-${building.status.toLowerCase().replace(/\s/g, "-")}">${building.dataCompleteness}% · ${escapeHtml(building.status)}</b></td>
+              </tr>
+            `).join("")}</tbody>
+          </table>
+        </div>
+      </section>
+      <section class="report-section">
+        <div class="report-section-head"><div><p class="eyebrow">Disclosure readiness</p><h4>Evidence and gaps</h4></div><span>${result.disclosures.filter((item) => item.status === "Ready").length} ready</span></div>
+        <div class="disclosure-grid">
+          ${result.disclosures.map((item) => `
+            <article class="disclosure-card disclosure-${item.status.toLowerCase()}">
+              <div><strong>${escapeHtml(item.topic)}</strong><span>${escapeHtml(item.status)}</span></div>
+              <p>${escapeHtml(item.summary)}</p>
+              <small><b>Evidence</b>${escapeHtml(item.evidence)}</small>
+              ${item.gap ? `<small><b>Gap</b>${escapeHtml(item.gap)}</small>` : ""}
+            </article>
+          `).join("")}
+        </div>
+      </section>
+      <section class="report-section">
+        <div class="report-section-head"><div><p class="eyebrow">90-day roadmap</p><h4>Prioritised actions</h4></div></div>
+        <div class="esg-actions">
+          ${result.actions.map((item) => `<article><span class="priority-${item.priority.toLowerCase()}">${escapeHtml(item.priority)}</span><div><strong>${escapeHtml(item.action)}</strong><p>${escapeHtml(item.impact)}</p><small>${escapeHtml(item.owner)} · ${escapeHtml(item.dueDate)}</small></div></article>`).join("")}
+        </div>
+      </section>
+      <section class="methodology-note"><strong>Methodology</strong><span>${escapeHtml(result.methodology)}</span></section>
+      <footer class="report-signoff"><strong>Review draft only</strong><span>${result.caveats.map(escapeHtml).join(" ")}</span></footer>
+    </article>
+  `;
+}
+
 async function qualifySelectedLead() {
   const lead = leadById(state.selectedLeadId);
   const property = listingById(lead.propertyId);
@@ -766,6 +1035,18 @@ function wireEvents() {
   $("#lease-document").addEventListener("change", renderLeaseSource);
   $("#assistant-form").addEventListener("submit", submitAssistantMessage);
   $("#assistant-building").addEventListener("change", renderAssistantBuilding);
+  $("#maintenance-form").addEventListener("submit", submitMaintenance);
+  $("#maintenance-asset").addEventListener("change", renderMaintenanceAssetProfile);
+  $("#maintenance-form").addEventListener("change", () => {
+    state.maintenanceRequestId += 1;
+    invalidateGeneratedOutput("#maintenance-output", "Condition analysis");
+  });
+  $("#esg-form").addEventListener("submit", submitEsg);
+  $("#esg-scope").addEventListener("change", renderEsgSourceOverview);
+  $("#esg-form").addEventListener("change", () => {
+    state.esgRequestId += 1;
+    invalidateGeneratedOutput("#esg-output", "Sustainability draft");
+  });
   $(".assistant-workspace").addEventListener("click", (event) => {
     const prompt = event.target.closest("[data-assistant-prompt]")?.dataset.assistantPrompt;
     if (!prompt || state.assistantPending) return;
@@ -808,12 +1089,16 @@ async function initialize() {
     state.leads = bootstrap.leads;
     state.leases = bootstrap.leaseDocuments;
     state.buildings = bootstrap.buildingProfiles;
+    state.maintenanceAssets = bootstrap.maintenanceAssets;
+    state.esgPortfolio = bootstrap.esgPortfolio;
     renderStatus();
     renderPropertySelect();
     renderLeadList();
     renderValuationPropertySelect();
     renderLeaseSelect();
     renderAssistantBuildingSelect();
+    renderMaintenanceAssetSelect();
+    renderEsgScopeSelect();
     selectLead(state.leads[0].id);
     const requestedDemo = window.location.hash.slice(1);
     if ($(`.demo-tab[data-demo="${requestedDemo}"]`)) activateDemo(requestedDemo, false);

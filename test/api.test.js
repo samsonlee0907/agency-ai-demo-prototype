@@ -41,6 +41,8 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.equal(bootstrap.leads.length, 4);
   assert.equal(bootstrap.leaseDocuments.length, 3);
   assert.equal(bootstrap.buildingProfiles.length, 3);
+  assert.equal(bootstrap.maintenanceAssets.length, 4);
+  assert.equal(bootstrap.esgPortfolio.buildings.length, 3);
 
   const matchResponse = await fetch(`${base}/api/match`, {
     method: "POST",
@@ -96,4 +98,48 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   const assistant = await assistantResponse.json();
   assert.equal(assistant.workOrder.created, true);
   assert.equal(assistant.category, "Maintenance");
+
+  const maintenanceResponse = await fetch(`${base}/api/maintenance`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "mock", assetId: "asset-meridian-chiller-02", horizon: 30 })
+  });
+  assert.equal(maintenanceResponse.status, 200);
+  const maintenance = await maintenanceResponse.json();
+  assert.equal(maintenance.failureRisk, "High");
+  assert.equal(maintenance.workOrder.created, true);
+
+  const esgResponse = await fetch(`${base}/api/esg`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "mock",
+      settings: {
+        scope: "portfolio",
+        reportingPeriod: "FY2026 · 1 July 2025–30 June 2026",
+        framework: "GRESB review draft",
+        focus: "Balanced portfolio"
+      }
+    })
+  });
+  assert.equal(esgResponse.status, 200);
+  const esg = await esgResponse.json();
+  assert.equal(esg.buildings.length, 3);
+  assert.equal(esg.assuranceStatus, "Draft");
+  assert.ok(esg.metrics.every((metric) => Number.isFinite(metric.value)));
+
+  const invalidPeriodResponse = await fetch(`${base}/api/esg`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "mock",
+      settings: {
+        scope: "portfolio",
+        reportingPeriod: "FY2035",
+        framework: "GRESB review draft",
+        focus: "Balanced portfolio"
+      }
+    })
+  });
+  assert.equal(invalidPeriodResponse.status, 400);
 });

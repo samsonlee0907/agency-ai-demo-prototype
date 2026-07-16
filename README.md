@@ -1,6 +1,6 @@
 # Aurelia Agency AI Studio
 
-A lightweight, client-facing web app demonstrating six Microsoft Foundry use cases for property agencies and brokerages:
+A lightweight, client-facing web app demonstrating eight Microsoft Foundry use cases for property agencies, brokerages and managed-property teams:
 
 1. **Intelligent property matching** — turns a structured buyer brief into an explainable ranked shortlist.
 2. **Marketing content studio** — creates coordinated property copy and uses MAI image editing to polish the selected authentic base photograph.
@@ -8,6 +8,8 @@ A lightweight, client-facing web app demonstrating six Microsoft Foundry use cas
 4. **Valuation assistant (AVM copilot)** — reconciles fictional comparable transactions into an indicative range and valuer-review draft.
 5. **Lease and contract abstraction** — extracts commercial terms, obligations, critical dates and review flags from sample agreements.
 6. **Tenant virtual assistant** — answers grounded building questions, triages maintenance and creates transparent work-order hand-offs in a conversational interface.
+7. **Predictive maintenance and energy** — correlates fictional BMS and condition signals into explainable failure risk, energy impact and technician-ready actions.
+8. **ESG and sustainability copilot** — calculates portfolio KPIs, identifies evidence gaps and prepares a management review draft with owned next actions.
 
 The app works immediately with deterministic mock data. Live mode uses GPT-5.4 and MAI-Image-2.5 through server-side providers, so browser code never receives model credentials.
 
@@ -95,8 +97,9 @@ The edit prompt explicitly preserves the property's architecture, materials, lan
 public/                       responsive vanilla HTML/CSS/JS client
 server.js                     Express static host and secure API proxy
 src/config.js                 endpoint normalization and public readiness state
-src/data.js                   realistic listings and inbound enquiries
-src/mock-services.js          deterministic workflows for all five scenarios
+src/data.js                   realistic agency, lease and tenant fixtures
+src/operations-data.js        fictional asset telemetry and ESG source records
+src/mock-services.js          deterministic workflows and portfolio calculations
 src/providers/gpt.js          GPT Responses API + strict output validation
 src/providers/mai-image.js    MAI generation/edit routes and response parsing
 src/property-image-prompts.js restrained base-generation and edit directions
@@ -107,4 +110,4 @@ test/                         focused unit and API smoke tests
 
 `GET /api/status` reports only model readiness and deployment names—never endpoints or secrets. Live provider failures return explicit API errors and are never replaced with mock success.
 
-`POST /api/valuation`, `POST /api/lease` and `POST /api/assistant` use the same server-side GPT-5.4 Responses provider and strict schema validation as the original scenarios. Comparable sales, lease documents, parties, buildings and work orders are fictional demo data. Valuation output requires qualified-valuer sign-off; lease output requires professional legal review; the tenant assistant directs immediate danger to emergency services rather than relying on automated triage.
+`POST /api/valuation`, `POST /api/lease`, `POST /api/assistant`, `POST /api/maintenance` and `POST /api/esg` use the same server-side GPT-5.4 Responses provider and strict schema validation as the original scenarios. Comparable sales, leases, buildings, telemetry and sustainability records are fictional demo data. Predictive-maintenance readings and ESG metrics are calculated and restored from server evidence after generation, so GPT explains the data without replacing source facts. All advisory, legal, maintenance and sustainability outputs require appropriate professional review.

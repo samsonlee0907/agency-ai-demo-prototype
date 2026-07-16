@@ -1,4 +1,5 @@
 import { comparableSales, findBuilding, findLease, findListing, findLead, listings } from "./data.js";
+import { esgPortfolio, findMaintenanceAsset } from "./operations-data.js";
 
 const priorityMap = new Map([
   ["water", "water views"],
@@ -349,6 +350,248 @@ export function answerTenant(buildingId, message) {
       suggestions: ["Show me the evacuation guidance", "Contact building security"]
     };
   }
+
+  return answerTenantNonEmergency(building, normalized);
+}
+
+  function round(value, digits = 1) {
+    const factor = 10 ** digits;
+    return Math.round(value * factor) / factor;
+  }
+
+  function signalSeverity(signal) {
+    const range = signal.direction === "low"
+      ? signal.baseline - signal.critical
+      : signal.critical - signal.baseline;
+    const deviation = signal.direction === "low"
+      ? signal.baseline - signal.current
+      : signal.current - signal.baseline;
+    const ratio = Math.max(0, deviation / range);
+    const criticalBreach = signal.direction === "low" ? signal.current <= signal.critical : signal.current >= signal.critical;
+    const warningBreach = signal.direction === "low" ? signal.current <= signal.warning : signal.current >= signal.warning;
+    if (criticalBreach) return { label: "Critical", ratio };
+    if (warningBreach) return { label: "Elevated", ratio };
+    if (ratio >= 0.35) return { label: "Watch", ratio };
+    return { label: "Normal", ratio };
+  }
+
+  export function analyseMaintenance(assetId, horizon = 30) {
+    const asset = findMaintenanceAsset(assetId);
+    if (!asset) throw new Error("Maintenance asset not found.");
+    const signalAssessments = asset.signals.map((signal) => ({ signal, ...signalSeverity(signal) }));
+    const averageRisk = signalAssessments.reduce((sum, item) => sum + Math.min(item.ratio, 1.2), 0) / signalAssessments.length;
+    const peakRisk = Math.max(...signalAssessments.map((item) => item.ratio));
+    const riskIndex = Math.min(1.2, averageRisk * 0.55 + peakRisk * 0.45);
+    const criticalPattern = signalAssessments.some((item) => item.label === "Critical") && averageRisk >= 0.65;
+    const calculatedHealth = Math.max(12, Math.min(99, Math.round(99 - riskIndex * 64)));
+    const healthScore = criticalPattern ? Math.min(30, calculatedHealth) : calculatedHealth;
+    const conditionRisk = criticalPattern ? "Critical" : healthScore <= 50 ? "High" : healthScore <= 72 ? "Moderate" : "Low";
+    const riskLevels = ["Low", "Moderate", "High", "Critical"];
+    const conditionLevel = riskLevels.indexOf(conditionRisk);
+    const failureRisk = horizon < asset.riskOnsetDays && conditionLevel > 0 ? riskLevels[conditionLevel - 1] : conditionRisk;
+    const workOrderRequired = conditionRisk === "Critical" || conditionRisk === "High";
+    const evidence = signalAssessments.map(({ signal, label }) => ({
+      signalId: signal.id,
+      label: signal.label,
+      reading: `${signal.current} ${signal.unit}`,
+      severity: label,
+      interpretation: label === "Critical"
+        ? `The reading has crossed the ${signal.critical} ${signal.unit} critical limit and requires technician verification.`
+        : label === "Elevated"
+          ? `The reading has moved beyond the ${signal.warning} ${signal.unit} warning level and is trending toward the ${signal.critical} ${signal.unit} critical limit.`
+          : label === "Watch"
+            ? `The reading has departed from the ${signal.baseline} ${signal.unit} baseline and should be watched against the ${signal.warning} ${signal.unit} warning level.`
+            : `The reading remains close to the ${signal.baseline} ${signal.unit} operating baseline.`
+    }));
+
+    return {
+      healthScore,
+      failureRisk,
+      confidence: asset.dataCompleteness,
+      predictedIssue: asset.diagnosis,
+      forecastWindow: horizon < asset.riskOnsetDays
+        ? `Material failure is not forecast inside the next ${horizon} days, but the condition trend requires monitoring`
+        : asset.forecastWindow,
+      summary: conditionRisk === "Low"
+        ? `${asset.name} is operating within its learned condition envelope. Continue planned servicing and monitor for sustained deviation.`
+        : horizon < asset.riskOnsetDays
+          ? `${asset.name} shows a coherent deterioration pattern, although the predicted failure window sits beyond the selected ${horizon}-day horizon. Early condition-based action remains appropriate.`
+          : `${asset.name} shows a coherent multi-signal deterioration pattern rather than an isolated sensor spike. Condition-based intervention is recommended before the forecast window closes.`,
+      evidence,
+      actions: asset.recommendedActions,
+      energyImpact: {
+        ...asset.energyImpact,
+        narrative: asset.energyImpact.excessKwhPerDay
+          ? `Returning the asset to baseline could avoid approximately ${asset.energyImpact.excessKwhPerDay} kWh per day and ${asset.energyImpact.annualEmissionsTonnes} tCO₂e annually.`
+          : "No material excess-energy penalty is visible in the current operating data."
+      },
+      workOrder: {
+        created: workOrderRequired,
+        reference: workOrderRequired ? `CBM-260716-${asset.id.endsWith("02") ? "042" : "043"}` : "",
+        title: workOrderRequired ? `Condition inspection · ${asset.name}` : "Continue planned maintenance",
+        status: workOrderRequired ? "Draft · awaiting facilities approval" : "No reactive work order required"
+      },
+      assumptions: [
+        `Forecast uses the latest ${asset.trend.length} condition readings and a ${horizon}-day review horizon.`,
+        "Weather, occupancy and operating schedules are treated as unchanged from the supplied context.",
+        "A qualified technician must verify the diagnosis before equipment is isolated or repaired."
+      ]
+    };
+  }
+
+  function percentChange(current, previous) {
+    return round(((current - previous) / previous) * 100);
+  }
+
+  function metricStatus(value, target, lowerIsBetter = true) {
+    if (lowerIsBetter) {
+      if (value <= target) return "On track";
+      if (value <= target * 1.1) return "Watch";
+      return "Off track";
+    }
+    if (value >= target) return "On track";
+    if (value >= target * 0.8) return "Watch";
+    return "Off track";
+  }
+
+  export function buildEsgEvidence(settings) {
+    const buildings = settings.scope === "portfolio"
+      ? esgPortfolio.buildings
+      : esgPortfolio.buildings.filter((building) => building.buildingId === settings.scope);
+    if (!buildings.length) throw new Error("ESG reporting scope not found.");
+
+    const sum = (key) => buildings.reduce((total, building) => total + building[key], 0);
+    const floorArea = sum("floorAreaSqm");
+    const energyMwh = buildings.reduce((total, building) => total + building.electricityMwh + building.gasGj / 3.6, 0);
+    const previousEnergyMwh = sum("previousEnergyMwh");
+    const emissions = buildings.reduce((total, building) => total + building.scope1Tonnes + building.scope2Tonnes, 0);
+    const previousEmissions = sum("previousEmissionsTonnes");
+    const weightedRenewables = buildings.reduce((total, building) => total + building.electricityMwh * building.renewablePercent, 0) / sum("electricityMwh");
+    const previousWeightedRenewables = buildings.reduce((total, building) => total + building.previousElectricityMwh * building.previousRenewablePercent, 0) / sum("previousElectricityMwh");
+    const wasteDiversion = (sum("recycledTonnes") / sum("wasteTonnes")) * 100;
+    const previousWasteDiversion = (sum("previousRecycledTonnes") / sum("previousWasteTonnes")) * 100;
+    const dataCompleteness = buildings.reduce((total, building) => total + building.dataCompleteness * building.floorAreaSqm, 0) / floorArea;
+    const previousDataCompleteness = buildings.reduce((total, building) => total + building.previousDataCompleteness * building.floorAreaSqm, 0) / floorArea;
+    const energyTarget = buildings.reduce((total, building) => total + building.targetEnergyIntensity * building.floorAreaSqm, 0) / floorArea;
+    const energyIntensity = energyMwh * 1000 / floorArea;
+    const waterIntensity = sum("waterKl") / floorArea;
+    const previousWaterIntensity = sum("previousWaterKl") / floorArea;
+
+    const evidenceBuildings = buildings.map((building) => {
+      const buildingEnergy = building.electricityMwh + building.gasGj / 3.6;
+      const buildingEnergyIntensity = buildingEnergy * 1000 / building.floorAreaSqm;
+      return {
+        buildingId: building.buildingId,
+        name: building.name,
+        energyIntensity: round(buildingEnergyIntensity),
+        carbonIntensity: round((building.scope1Tonnes + building.scope2Tonnes) * 1000 / building.floorAreaSqm),
+        waterIntensity: round(building.waterKl / building.floorAreaSqm, 2),
+        dataCompleteness: building.dataCompleteness,
+        status: metricStatus(buildingEnergyIntensity, building.targetEnergyIntensity)
+      };
+    });
+    const disclosures = esgPortfolio.disclosures.map((disclosure) => {
+      if (buildings.length !== 1) return { ...disclosure };
+      const building = buildings[0];
+      if (disclosure.topic === "Energy and emissions") {
+        return { ...disclosure, evidence: `Twelve monthly electricity and gas records mapped to ${building.name}` };
+      }
+      if (disclosure.topic === "Water stewardship" && building.buildingId !== "building-southbank") {
+        return {
+          ...disclosure,
+          status: "Ready",
+          evidence: `Twelve whole-building water records mapped to ${building.name}`,
+          gap: ""
+        };
+      }
+      if (disclosure.topic === "Water stewardship") {
+        return { ...disclosure, evidence: `Twelve whole-building water records mapped to ${building.name}` };
+      }
+      if (disclosure.topic === "Waste and circularity") {
+        return { ...disclosure, evidence: `Contractor weight tickets for ${building.name} cover 11 of 12 reporting months` };
+      }
+      if (disclosure.topic === "Targets and governance") {
+        return { ...disclosure, evidence: `${building.name} is included in the board-approved 2030 target and quarterly owner register` };
+      }
+      return { ...disclosure };
+    });
+
+    return {
+      scope: buildings.length === esgPortfolio.buildings.length ? "Aurelia managed portfolio" : buildings[0].name,
+      reportingPeriod: settings.reportingPeriod,
+      framework: settings.framework,
+      metrics: [
+        { key: "energy-intensity", label: "Energy intensity", value: round(energyIntensity), unit: "kWh/m²", changePercent: percentChange(energyMwh, previousEnergyMwh), target: `≤ ${round(energyTarget)} kWh/m²`, status: metricStatus(energyIntensity, energyTarget) },
+        { key: "operational-emissions", label: "Scope 1 + 2 emissions", value: round(emissions), unit: "tCO₂e", changePercent: percentChange(emissions, previousEmissions), target: "≥ 4% annual reduction", status: percentChange(emissions, previousEmissions) <= -4 ? "On track" : "Watch" },
+        { key: "renewable-electricity", label: "Renewable electricity", value: round(weightedRenewables), unit: "%", changePercent: percentChange(weightedRenewables, previousWeightedRenewables), target: "30% by FY2027", status: metricStatus(weightedRenewables, 30, false) },
+        { key: "water-intensity", label: "Water intensity", value: round(waterIntensity, 2), unit: "kL/m²", changePercent: percentChange(waterIntensity, previousWaterIntensity), target: "≤ 0.30 kL/m²", status: metricStatus(waterIntensity, 0.3) },
+        { key: "waste-diversion", label: "Waste diversion", value: round(wasteDiversion), unit: "%", changePercent: percentChange(wasteDiversion, previousWasteDiversion), target: "75% diversion", status: metricStatus(wasteDiversion, 75, false) },
+        { key: "data-completeness", label: "Data completeness", value: round(dataCompleteness), unit: "%", changePercent: percentChange(dataCompleteness, previousDataCompleteness), target: "≥ 95%", status: metricStatus(dataCompleteness, 95, false) }
+      ],
+      buildings: evidenceBuildings,
+      disclosures,
+      methodology: esgPortfolio.methodology
+    };
+  }
+
+  export function createEsgReport(settings) {
+    const evidence = buildEsgEvidence(settings);
+    const hasDataGaps = evidence.disclosures.some((disclosure) => disclosure.status === "Gap");
+    const hasPartial = evidence.disclosures.some((disclosure) => disclosure.status === "Partial");
+    const partialTopics = evidence.disclosures.filter((disclosure) => disclosure.status !== "Ready").map((disclosure) => disclosure.topic.toLowerCase());
+    const evidenceAction = evidence.disclosures.some((disclosure) => disclosure.topic === "Water stewardship" && disclosure.status !== "Ready")
+      ? { priority: "High", action: "Close the water-submeter evidence gap and obtain owner sign-off.", owner: "ESG data owner", dueDate: "31 July 2026", impact: "Improves assurance readiness and tenant allocation confidence." }
+      : { priority: "High", action: "Replace the estimated June waste composition with verified contractor evidence.", owner: "ESG data owner", dueDate: "31 July 2026", impact: "Removes the remaining material evidence qualification for this scope." };
+    const energyAction = { priority: "High", action: "Convert the top three plant optimisation opportunities into funded work orders.", owner: "Head of Facilities", dueDate: "31 August 2026", impact: "Targets the largest controllable energy and emissions variance." };
+    const renewableAction = { priority: "Medium", action: "Increase contracted renewable electricity toward the FY2027 portfolio target.", owner: "Procurement lead", dueDate: "30 September 2026", impact: "Reduces location-based Scope 2 exposure." };
+    const resourceAction = { priority: "Medium", action: "Complete a targeted water and waste variance review for the highest-intensity asset.", owner: "Sustainability manager", dueDate: "30 September 2026", impact: "Targets avoidable consumption and improves resource-efficiency evidence." };
+    const focusActions = settings.focus === "Carbon & energy"
+      ? [energyAction, renewableAction, evidenceAction]
+      : settings.focus === "Resource efficiency"
+        ? [evidenceAction, resourceAction, energyAction]
+        : [evidenceAction, energyAction, renewableAction];
+    const focusSummary = settings.focus === "Carbon & energy"
+      ? "The selected review prioritises plant efficiency and renewable-electricity procurement."
+      : settings.focus === "Resource efficiency"
+        ? "The selected review prioritises water, waste and evidence quality."
+        : "The selected review balances operational performance with evidence readiness.";
+    const partialLabel = partialTopics.join(" and ");
+    const readinessSummary = partialTopics.length
+      ? `${partialLabel.charAt(0).toUpperCase()}${partialLabel.slice(1)} records require confirmation before external submission.`
+      : "The scoped evidence set is assembled for reviewer confirmation before any external use.";
+    return {
+      ...evidence,
+      assuranceStatus: hasDataGaps ? "Data gaps" : hasPartial ? "Draft" : "Review ready",
+      executiveSummary: `${evidence.scope} reduced operational emissions year on year. ${focusSummary} ${readinessSummary}`,
+      metrics: evidence.metrics.map((metric) => ({
+        ...metric,
+        commentary: metric.status === "On track"
+          ? `${metric.label} is tracking to the stated portfolio objective.`
+          : `${metric.label} requires a targeted management response to close the gap to ${metric.target}.`
+      })),
+      buildings: evidence.buildings.map((building) => ({
+        ...building,
+        insight: building.status === "On track"
+          ? `${building.name} is within its current energy-intensity target and should focus on preserving performance.`
+          : `${building.name} should prioritise plant optimisation and evidence-quality actions before the next review.`
+      })),
+      disclosures: evidence.disclosures.map((disclosure) => ({
+        ...disclosure,
+        summary: disclosure.status === "Ready"
+          ? `${disclosure.topic} evidence is assembled for reviewer confirmation.`
+          : `${disclosure.topic} is partially evidenced and should remain marked as draft.`
+      })),
+      actions: focusActions,
+      caveats: [
+        "All portfolio values and targets are fictional demonstration data.",
+        "This output is a management review draft, not an assured disclosure or certification.",
+        "A sustainability professional should verify factors, boundaries and source records before external use."
+      ]
+    };
+  }
+
+function answerTenantNonEmergency(building, normalized) {
+  const findKnowledge = (pattern) => building.knowledge.find((article) => pattern.test(`${article.title} ${article.content}`));
 
   if (/(leak|water|flood|burst)/.test(normalized)) {
     const responseGuide = findKnowledge(/maintenance|fault|emergency|repair/i) || building.knowledge[0];
