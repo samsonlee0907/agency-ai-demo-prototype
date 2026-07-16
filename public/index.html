@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Interactive AI experiences for modern property agencies and brokerages.">
+  <title>Aurelia — Agency AI Studio</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header class="site-header">
+    <a class="brand" href="#" aria-label="Aurelia home">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><path d="M16 3 28 10v12l-12 7L4 22V10l12-7Zm0 5-7 4v8l7 4 7-4v-8l-7-4Z"/></svg>
+      </span>
+      <span><strong>Aurelia</strong><small>Agency AI Studio</small></span>
+    </a>
+
+    <div class="header-actions">
+      <div class="mode-switcher" aria-label="Data mode">
+        <button class="mode-option is-active" type="button" data-mode="mock">Mock data</button>
+        <button class="mode-option" type="button" data-mode="live">Live Foundry</button>
+      </div>
+      <button class="status-button" id="status-button" type="button" aria-expanded="false" aria-controls="status-popover">
+        <span class="status-dot"></span>
+        <span id="status-label">Connecting…</span>
+      </button>
+      <div class="status-popover" id="status-popover" hidden>
+        <p class="eyebrow">Model readiness</p>
+        <div class="model-status"><span><i id="gpt-dot"></i> GPT-5.4</span><strong id="gpt-status">Checking</strong></div>
+        <div class="model-status"><span><i id="mai-dot"></i> MAI-Image-2.5</span><strong id="mai-status">Checking</strong></div>
+        <p>Credentials stay on the server. Mock mode never calls a model endpoint.</p>
+      </div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <div class="hero-copy">
+      <p class="eyebrow"><span></span> AI for agency &amp; brokerage</p>
+      <h1>From enquiry to exchange,<br><em>intelligence at every step.</em></h1>
+      <p class="hero-lede">Three focused experiences that help property teams advise with precision, create with distinction and respond at the right moment.</p>
+      <div class="hero-proof">
+        <div><strong>3</strong><span>connected workflows</span></div>
+        <div><strong>24/7</strong><span>responsive experiences</span></div>
+        <div><strong>2</strong><span>specialist AI models</span></div>
+      </div>
+    </div>
+    <div class="hero-art" aria-hidden="true">
+      <div class="art-frame art-main"><img src="/assets/harbour-house.svg" alt=""></div>
+      <div class="art-frame art-detail"><img src="/assets/atelier-residence.svg" alt=""></div>
+      <div class="art-note">
+        <span>Curated intelligence</span>
+        <strong>Built around the property journey</strong>
+      </div>
+      <svg class="hero-line" viewBox="0 0 200 150"><path d="M10 125C65 120 58 25 150 32c22 1 29 17 40 7"/></svg>
+    </div>
+  </section>
+
+  <nav class="demo-nav" aria-label="Choose a demo">
+    <button class="demo-tab is-active" type="button" data-demo="matching" aria-controls="matching" aria-selected="true">
+      <span class="tab-number">01</span>
+      <span><strong>Property matching</strong><small>Turn buyer intent into a ranked shortlist</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <button class="demo-tab" type="button" data-demo="marketing" aria-controls="marketing" aria-selected="false">
+      <span class="tab-number">02</span>
+      <span><strong>Content studio</strong><small>Create campaigns with a distinct point of view</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <button class="demo-tab" type="button" data-demo="leads" aria-controls="leads" aria-selected="false">
+      <span class="tab-number">03</span>
+      <span><strong>Lead qualification</strong><small>Know who to call, when and why</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+  </nav>
+
+  <main id="main-content">
+    <section class="demo-panel is-active" id="matching" aria-labelledby="matching-title">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">01 / Intelligent property matching</p>
+          <h2 id="matching-title">A shortlist shaped around the buyer.</h2>
+        </div>
+        <p>Translate a conversational brief into a ranked, explainable set of opportunities—without losing the judgement of a trusted adviser.</p>
+      </div>
+
+      <div class="workspace matching-workspace">
+        <aside class="control-panel">
+          <div class="panel-heading">
+            <span class="icon-box" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 19v-7l8-7 8 7v7a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1Z"/></svg>
+            </span>
+            <div><p class="eyebrow">Buyer brief</p><h3>Define the search</h3></div>
+          </div>
+          <form id="match-form">
+            <div class="field-grid">
+              <label>Preferred location
+                <select name="location">
+                  <option>Double Bay</option>
+                  <option>Mosman</option>
+                  <option>Bronte</option>
+                  <option>Woollahra</option>
+                  <option>Surry Hills</option>
+                  <option>Any Sydney</option>
+                </select>
+              </label>
+              <label>Budget
+                <select name="budget">
+                  <option value="3000000">Up to $3.0m</option>
+                  <option value="4000000">Up to $4.0m</option>
+                  <option value="4800000" selected>Up to $4.8m</option>
+                  <option value="6000000">Up to $6.0m</option>
+                  <option value="8000000">Up to $8.0m</option>
+                </select>
+              </label>
+              <label>Bedrooms
+                <select name="beds">
+                  <option value="2">2+</option>
+                  <option value="3">3+</option>
+                  <option value="4" selected>4+</option>
+                  <option value="5">5+</option>
+                </select>
+              </label>
+              <label>Property type
+                <select name="propertyType">
+                  <option>Any type</option>
+                  <option selected>House</option>
+                  <option>Apartment</option>
+                  <option>Townhouse</option>
+                  <option>Terrace</option>
+                  <option>Penthouse</option>
+                </select>
+              </label>
+            </div>
+            <label>Priorities
+              <textarea name="priorities" rows="5" placeholder="Describe the buyer's lifestyle, non-negotiables and preferences…">Quiet street, strong schools, outdoor entertaining and water views. We need a home office and would value village walkability.</textarea>
+            </label>
+            <div class="example-prompt"><span>Try</span> “North-facing, low maintenance and close to restaurants”</div>
+            <button class="button button-primary button-wide" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3Zm6 11 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z"/></svg>
+              <span>Find intelligent matches</span>
+            </button>
+          </form>
+        </aside>
+
+        <div class="results-panel">
+          <div class="results-toolbar">
+            <div><p class="eyebrow">Curated shortlist</p><h3 id="match-result-title">Ready when your buyer is</h3></div>
+            <span class="model-chip">GPT-5.4 reasoning</span>
+          </div>
+          <div id="match-results" class="empty-state">
+            <span class="empty-icon">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4M8 11h6M11 8v6"/></svg>
+            </span>
+            <h4>Build the buyer brief</h4>
+            <p>Run the search to see ranked properties, clear reasoning and honest trade-offs.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo-panel" id="marketing" aria-labelledby="marketing-title" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">02 / Marketing content studio</p>
+          <h2 id="marketing-title">One property. A complete campaign.</h2>
+        </div>
+        <p>Shape the narrative, adapt it for the channel and create an image direction—all grounded in the property’s real attributes.</p>
+      </div>
+
+      <div class="workspace studio-workspace">
+        <aside class="control-panel">
+          <div class="panel-heading">
+            <span class="icon-box" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m4 20 4.5-1 10-10-3.5-3.5-10 10L4 20ZM13.5 7 17 10.5M14 4l1-2 1 2 2 1-2 1-1 2-1-2-2-1 2-1Z"/></svg>
+            </span>
+            <div><p class="eyebrow">Campaign brief</p><h3>Set the direction</h3></div>
+          </div>
+          <form id="marketing-form">
+            <label>Featured property
+              <select id="marketing-property" name="propertyId"></select>
+            </label>
+            <div class="selected-property" id="selected-property"></div>
+            <label>Audience
+              <select name="audience">
+                <option>Established families</option>
+                <option>Design-conscious professionals</option>
+                <option>Downsizers</option>
+                <option>International buyers</option>
+                <option>Prestige investors</option>
+              </select>
+            </label>
+            <div class="field-grid">
+              <label>Channel
+                <select name="channel">
+                  <option>Digital campaign</option>
+                  <option>Listing portal</option>
+                  <option>Instagram</option>
+                  <option>Print brochure</option>
+                  <option>Email campaign</option>
+                </select>
+              </label>
+              <label>Tone
+                <select name="tone">
+                  <option>Refined editorial</option>
+                  <option>Warm and inviting</option>
+                  <option>Confident luxury</option>
+                  <option>Direct and modern</option>
+                </select>
+              </label>
+            </div>
+            <button class="button button-primary button-wide" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3Zm6 11 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z"/></svg>
+              <span>Create campaign</span>
+            </button>
+          </form>
+        </aside>
+
+        <div class="content-preview" id="marketing-output">
+          <div class="preview-placeholder">
+            <div class="preview-sheet">
+              <span></span><span></span><span></span><span></span>
+            </div>
+            <p class="eyebrow">Campaign preview</p>
+            <h3>Creativity, grounded in property truth.</h3>
+            <p>Choose a property and direction to generate a coordinated campaign suite.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo-panel" id="leads" aria-labelledby="leads-title" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">03 / Lead qualification agent</p>
+          <h2 id="leads-title">Every enquiry, understood in context.</h2>
+        </div>
+        <p>Turn scattered signals into a clear priority, a practical next step and a personal response your team can make their own.</p>
+      </div>
+
+      <div class="workspace leads-workspace">
+        <aside class="lead-inbox">
+          <div class="inbox-heading">
+            <div><p class="eyebrow">Live enquiry feed</p><h3>New leads</h3></div>
+            <span id="lead-count" class="count-badge">0</span>
+          </div>
+          <div id="lead-list" class="lead-list" role="list"></div>
+        </aside>
+
+        <div class="lead-detail" id="lead-detail">
+          <div class="empty-state">
+            <span class="empty-icon">
+              <svg viewBox="0 0 24 24"><path d="M5 4h14v13H8l-3 3V4Z"/><path d="M9 9h6M9 12h4"/></svg>
+            </span>
+            <h4>Select an enquiry</h4>
+            <p>Review the message, then ask the agent to qualify intent and recommend the next move.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <a class="brand footer-brand" href="#" aria-label="Aurelia home">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M16 3 28 10v12l-12 7L4 22V10l12-7Zm0 5-7 4v8l7 4 7-4v-8l-7-4Z"/></svg></span>
+      <span><strong>Aurelia</strong><small>Agency AI Studio</small></span>
+    </a>
+    <p>Property intelligence, thoughtfully applied.</p>
+    <span>Powered by GPT-5.4 + MAI-Image-2.5</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
