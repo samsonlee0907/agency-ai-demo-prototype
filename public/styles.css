@@ -140,12 +140,29 @@ a { color: inherit; }
   box-shadow: var(--shadow);
 }
 
-.status-popover > p:last-child { margin: 14px 0 0; color: var(--ink-muted); font-size: 11px; }
+.status-popover > p { margin: 14px 0; color: var(--ink-muted); font-size: 11px; }
 .model-status { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
 .model-status span { display: flex; align-items: center; gap: 8px; }
 .model-status i { width: 7px; height: 7px; border-radius: 50%; background: #aaa; }
 .model-status i.ready { background: var(--success); }
 .model-status strong { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.configure-button { width: 100%; padding: 10px; border: 1px solid var(--navy); background: var(--navy); color: white; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+
+.settings-dialog { width: min(680px, calc(100vw - 30px)); max-height: calc(100vh - 30px); padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--navy); box-shadow: var(--shadow); }
+.settings-dialog::backdrop { background: rgba(7, 23, 34, .62); backdrop-filter: blur(4px); }
+.settings-dialog form { gap: 22px; padding: clamp(24px, 5vw, 42px); }
+.dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.dialog-heading .eyebrow { margin-bottom: 4px; }
+.dialog-heading h2 { margin: 0; font-family: var(--serif); font-size: 34px; font-weight: 400; }
+.dialog-close { width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--ink-muted); font-size: 23px; line-height: 1; cursor: pointer; }
+.dialog-intro { margin: -8px 0 0; color: var(--ink-muted); font-size: 11px; }
+.dialog-intro code { color: var(--navy); }
+.settings-dialog fieldset { display: grid; gap: 15px; margin: 0; padding: 20px; border: 1px solid var(--line); }
+.settings-dialog legend { padding: 0 8px; color: var(--gold); font-family: var(--serif); font-size: 15px; }
+.settings-dialog input { height: 44px; padding: 0 12px; }
+.settings-dialog label small { color: var(--ink-muted); font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.dialog-error { padding: 12px; border: 1px solid #e3b9b1; background: #fff4f1; color: var(--error); font-size: 11px; }
 
 .hero {
   display: grid;

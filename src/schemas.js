@@ -2,6 +2,18 @@ import { z } from "zod";
 
 export const modeSchema = z.enum(["mock", "live"]).default("mock");
 
+const providerSettingsSchema = z.object({
+  endpoint: z.union([z.string().trim().url().max(500), z.literal("")]),
+  apiKey: z.string().trim().max(4096).optional().default(""),
+  identifier: z.string().trim().min(1).max(120)
+});
+
+export const settingsRequestSchema = z.object({
+  defaultMode: z.enum(["mock", "live"]),
+  gpt: providerSettingsSchema,
+  mai: providerSettingsSchema
+});
+
 export const buyerBriefSchema = z.object({
   location: z.string().trim().min(1).max(80),
   budget: z.coerce.number().int().min(500000).max(20000000),

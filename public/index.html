@@ -33,6 +33,7 @@
         <div class="model-status"><span><i id="gpt-dot"></i> GPT-5.4</span><strong id="gpt-status">Checking</strong></div>
         <div class="model-status"><span><i id="mai-dot"></i> MAI-Image-2.5</span><strong id="mai-status">Checking</strong></div>
         <p>Credentials stay on the server. Mock mode never calls a model endpoint.</p>
+        <button class="configure-button" id="configure-button" type="button">Configure live endpoints</button>
       </div>
     </div>
   </header>
@@ -273,5 +274,63 @@
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
+    <form id="settings-form">
+      <div class="dialog-heading">
+        <div>
+          <p class="eyebrow">Secure local configuration</p>
+          <h2 id="settings-title">Live Foundry settings</h2>
+        </div>
+        <button class="dialog-close" id="settings-close" type="button" aria-label="Close settings">×</button>
+      </div>
+      <p class="dialog-intro">Settings are written to the server’s ignored <code>.env</code> file and applied immediately. Saved API keys are never returned to the browser.</p>
+
+      <label>Default experience
+        <select name="defaultMode">
+          <option value="mock">Mock data</option>
+          <option value="live">Live Foundry</option>
+        </select>
+      </label>
+
+      <fieldset>
+        <legend>GPT-5.4 · Azure OpenAI Responses API</legend>
+        <label>Endpoint
+          <input name="gptEndpoint" type="url" placeholder="https://your-resource.openai.azure.com/openai/v1/">
+        </label>
+        <div class="field-grid">
+          <label>Deployment
+            <input name="gptIdentifier" required value="gpt-5.4">
+          </label>
+          <label>API key
+            <input name="gptApiKey" type="password" autocomplete="new-password" placeholder="Enter key">
+            <small id="gpt-key-hint">No key saved</small>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>MAI-Image-2.5 · Microsoft Foundry</legend>
+        <label>Endpoint
+          <input name="maiEndpoint" type="url" placeholder="https://your-resource.services.ai.azure.com">
+        </label>
+        <div class="field-grid">
+          <label>Model / deployment
+            <input name="maiIdentifier" required value="MAI-Image-2.5">
+          </label>
+          <label>API key
+            <input name="maiApiKey" type="password" autocomplete="new-password" placeholder="Enter key">
+            <small id="mai-key-hint">No key saved</small>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="dialog-error" id="settings-error" role="alert" hidden></div>
+      <div class="dialog-actions">
+        <button class="button button-secondary" id="settings-cancel" type="button">Cancel</button>
+        <button class="button button-primary" type="submit"><span>Save and apply</span></button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

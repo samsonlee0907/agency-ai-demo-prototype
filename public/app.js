@@ -90,6 +90,63 @@ function renderStatus() {
   updateMode(status.defaultMode);
 }
 
+async function openSettings() {
+  const dialog = $("#settings-dialog");
+  $("#status-popover").hidden = true;
+  $("#status-button").setAttribute("aria-expanded", "false");
+  $("#settings-error").hidden = true;
+
+  try {
+    const settings = await api("/api/settings");
+    const form = $("#settings-form");
+    form.elements.defaultMode.value = settings.defaultMode;
+    form.elements.gptEndpoint.value = settings.gpt.endpoint;
+    form.elements.gptIdentifier.value = settings.gpt.identifier;
+    form.elements.gptApiKey.value = "";
+    form.elements.maiEndpoint.value = settings.mai.endpoint;
+    form.elements.maiIdentifier.value = settings.mai.identifier;
+    form.elements.maiApiKey.value = "";
+    $("#gpt-key-hint").textContent = settings.gpt.hasApiKey ? "A key is saved; leave blank to keep it" : "No key saved";
+    $("#mai-key-hint").textContent = settings.mai.hasApiKey ? "A key is saved; leave blank to keep it" : "No key saved";
+    dialog.showModal();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+function closeSettings() {
+  $("#settings-dialog").close();
+}
+
+async function saveSettings(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = $('button[type="submit"]', form);
+  const data = Object.fromEntries(new FormData(form));
+  const errorBox = $("#settings-error");
+  errorBox.hidden = true;
+  setButtonLoading(button, true, "Saving securely…");
+
+  try {
+    state.status = await api("/api/settings", {
+      method: "PUT",
+      body: JSON.stringify({
+        defaultMode: data.defaultMode,
+        gpt: { endpoint: data.gptEndpoint, identifier: data.gptIdentifier, apiKey: data.gptApiKey },
+        mai: { endpoint: data.maiEndpoint, identifier: data.maiIdentifier, apiKey: data.maiApiKey }
+      })
+    });
+    renderStatus();
+    closeSettings();
+    showToast("Live endpoint settings saved and applied.");
+  } catch (error) {
+    errorBox.textContent = error.message;
+    errorBox.hidden = false;
+  } finally {
+    setButtonLoading(button, false);
+  }
+}
+
 function activateDemo(id) {
   $$(".demo-tab").forEach((button) => {
     const active = button.dataset.demo === id;
@@ -395,6 +452,10 @@ function wireEvents() {
     popover.hidden = !popover.hidden;
     $("#status-button").setAttribute("aria-expanded", String(!popover.hidden));
   });
+  $("#configure-button").addEventListener("click", openSettings);
+  $("#settings-form").addEventListener("submit", saveSettings);
+  $("#settings-close").addEventListener("click", closeSettings);
+  $("#settings-cancel").addEventListener("click", closeSettings);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       $("#status-popover").hidden = true;

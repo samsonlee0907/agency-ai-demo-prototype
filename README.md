@@ -29,7 +29,9 @@ npm run lint   # syntax-check project JavaScript
 
 ## Configure live models
 
-Copy `.env.example` to `.env`, add credentials, and optionally set `MODEL_MODE=live`. Mock remains the safe default. The interface can switch to Live Foundry only when GPT is configured; image generation additionally requires MAI configuration.
+Open the model status control in the top-right of the portal and choose **Configure live endpoints**. The local-only settings dialog writes credentials to the server's ignored `.env` file and applies them immediately. Existing keys are never returned to the browser; leave a key field blank to retain its saved value.
+
+You can alternatively copy `.env.example` to `.env` and edit it manually. Mock remains the safe default. The interface can switch to Live Foundry only when GPT is configured; image generation additionally requires MAI configuration.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |

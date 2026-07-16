@@ -14,6 +14,12 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.equal(status.defaultMode, "mock");
   assert.equal("apiKey" in status.gpt, false);
 
+  const settingsResponse = await fetch(`${base}/api/settings`);
+  assert.equal(settingsResponse.status, 200);
+  const settings = await settingsResponse.json();
+  assert.equal(settings.gpt.identifier, "gpt-5.4");
+  assert.equal("apiKey" in settings.gpt, false);
+
   const bootstrapResponse = await fetch(`${base}/api/bootstrap`);
   const bootstrap = await bootstrapResponse.json();
   assert.equal(bootstrap.listings.length, 6);
