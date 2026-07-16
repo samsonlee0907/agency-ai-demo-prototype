@@ -87,11 +87,13 @@ app.get("/api/settings", requireLocalRequest, (_request, response) => {
     gpt: {
       endpoint: runtime.config.gpt.endpoint,
       identifier: runtime.config.gpt.deployment,
+      authMode: runtime.config.gpt.authMode,
       hasApiKey: Boolean(runtime.config.gpt.apiKey)
     },
     mai: {
       endpoint: runtime.config.mai.endpoint,
       identifier: runtime.config.mai.model,
+      authMode: runtime.config.mai.authMode,
       hasApiKey: Boolean(runtime.config.mai.apiKey)
     }
   });

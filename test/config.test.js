@@ -38,6 +38,7 @@ test("live mode falls back explicitly when GPT credentials are incomplete", () =
     MODEL_MODE: "live",
     GPT_ENDPOINT: "https://contoso.openai.azure.com",
     GPT_API_KEY: "",
+    GPT_AUTH_MODE: "api-key",
     GPT_DEPLOYMENT: "gpt-5.4",
     MAI_ENDPOINT: "",
     MAI_API_KEY: ""
@@ -48,7 +49,26 @@ test("live mode falls back explicitly when GPT credentials are incomplete", () =
   assert.deepEqual(publicStatus(config), {
     defaultMode: "mock",
     requestedMode: "live",
-    gpt: { configured: false, deployment: "gpt-5.4" },
-    mai: { configured: false, model: "MAI-Image-2.5" }
+    gpt: { configured: false, deployment: "gpt-5.4", authMode: "api-key" },
+    mai: { configured: false, model: "MAI-Image-2.5", authMode: "api-key" }
   });
+});
+
+test("Microsoft Entra mode is configured without an API key", () => {
+  const config = getConfig({
+    MODEL_MODE: "live",
+    GPT_ENDPOINT: "https://contoso.openai.azure.com",
+    GPT_AUTH_MODE: "entra",
+    GPT_API_KEY: "",
+    GPT_DEPLOYMENT: "gpt-5.4",
+    MAI_ENDPOINT: "https://contoso.services.ai.azure.com",
+    MAI_AUTH_MODE: "entra",
+    MAI_API_KEY: ""
+  });
+
+  assert.equal(config.gpt.configured, true);
+  assert.equal(config.gpt.authMode, "entra");
+  assert.equal(config.defaultMode, "live");
+  assert.equal(config.mai.configured, true);
+  assert.equal(config.mai.authMode, "entra");
 });

@@ -50,17 +50,23 @@ export function getConfig(env = process.env) {
     gpt: {
       endpoint: gptEndpoint,
       apiKey: String(env.GPT_API_KEY || "").trim(),
-      deployment: String(env.GPT_DEPLOYMENT || "gpt-5.4").trim()
+      deployment: String(env.GPT_DEPLOYMENT || "gpt-5.4").trim(),
+      authMode: env.GPT_AUTH_MODE === "entra" ? "entra" : "api-key"
     },
     mai: {
       endpoint: maiEndpoint,
       apiKey: String(env.MAI_API_KEY || "").trim(),
-      model: String(env.MAI_MODEL || "MAI-Image-2.5").trim()
+      model: String(env.MAI_MODEL || "MAI-Image-2.5").trim(),
+      authMode: env.MAI_AUTH_MODE === "entra" ? "entra" : "api-key"
     }
   };
 
-  config.gpt.configured = Boolean(config.gpt.endpoint && config.gpt.apiKey);
-  config.mai.configured = Boolean(config.mai.endpoint && config.mai.apiKey);
+  config.gpt.configured = Boolean(
+    config.gpt.endpoint && (config.gpt.authMode === "entra" || config.gpt.apiKey)
+  );
+  config.mai.configured = Boolean(
+    config.mai.endpoint && (config.mai.authMode === "entra" || config.mai.apiKey)
+  );
   config.defaultMode = requestedMode === "live" && config.gpt.configured ? "live" : "mock";
   return config;
 }
@@ -71,11 +77,13 @@ export function publicStatus(config) {
     requestedMode: config.requestedMode,
     gpt: {
       configured: config.gpt.configured,
-      deployment: config.gpt.deployment
+      deployment: config.gpt.deployment,
+      authMode: config.gpt.authMode
     },
     mai: {
       configured: config.mai.configured,
-      model: config.mai.model
+      model: config.mai.model,
+      authMode: config.mai.authMode
     }
   };
 }

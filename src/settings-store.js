@@ -4,9 +4,11 @@ import path from "node:path";
 const MANAGED_KEYS = [
   "MODEL_MODE",
   "GPT_ENDPOINT",
+  "GPT_AUTH_MODE",
   "GPT_API_KEY",
   "GPT_DEPLOYMENT",
   "MAI_ENDPOINT",
+  "MAI_AUTH_MODE",
   "MAI_API_KEY",
   "MAI_MODEL"
 ];
@@ -19,9 +21,11 @@ export function settingsToEnv(settings, currentConfig) {
   return {
     MODEL_MODE: settings.defaultMode,
     GPT_ENDPOINT: settings.gpt.endpoint,
+    GPT_AUTH_MODE: settings.gpt.authMode,
     GPT_API_KEY: settings.gpt.apiKey || currentConfig.gpt.apiKey,
     GPT_DEPLOYMENT: settings.gpt.identifier,
     MAI_ENDPOINT: settings.mai.endpoint,
+    MAI_AUTH_MODE: settings.mai.authMode,
     MAI_API_KEY: settings.mai.apiKey || currentConfig.mai.apiKey,
     MAI_MODEL: settings.mai.identifier
   };

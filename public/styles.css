@@ -161,6 +161,8 @@ a { color: inherit; }
 .settings-dialog legend { padding: 0 8px; color: var(--gold); font-family: var(--serif); font-size: 15px; }
 .settings-dialog input { height: 44px; padding: 0 12px; }
 .settings-dialog label small { color: var(--ink-muted); font-size: 9px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+.auth-help { margin: 0; padding: 10px 12px; border-left: 2px solid var(--gold); background: var(--ivory); color: var(--ink-muted); font-size: 10px; }
+.is-hidden { display: none !important; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 .dialog-error { padding: 12px; border: 1px solid #e3b9b1; background: #fff4f1; color: var(--error); font-size: 11px; }
 

@@ -82,12 +82,32 @@ function updateMode(mode) {
 
 function renderStatus() {
   const { status } = state;
-  $("#gpt-status").textContent = status.gpt.configured ? status.gpt.deployment : "Not configured";
-  $("#mai-status").textContent = status.mai.configured ? status.mai.model : "Not configured";
+  const authLabel = status.gpt.authMode === "entra" ? "Entra ID" : "API key";
+  $("#gpt-status").textContent = status.gpt.configured ? `${status.gpt.deployment} · ${authLabel}` : "Not configured";
+  const maiAuthLabel = status.mai.authMode === "entra" ? "Entra ID" : "API key";
+  $("#mai-status").textContent = status.mai.configured ? `${status.mai.model} · ${maiAuthLabel}` : "Not configured";
   $("#gpt-dot").classList.toggle("ready", status.gpt.configured);
   $("#mai-dot").classList.toggle("ready", status.mai.configured);
   $('[data-mode="live"]').disabled = !status.gpt.configured;
   updateMode(status.defaultMode);
+}
+
+function renderGptAuthMode() {
+  const entra = $("#gpt-auth-mode").value === "entra";
+  $("#gpt-api-key-field").classList.toggle("is-hidden", entra);
+  $("#gpt-api-key-field input").disabled = entra;
+  $("#gpt-auth-help").textContent = entra
+    ? "Uses DefaultAzureCredential: your Azure CLI sign-in locally, or managed identity when hosted in Azure. The identity needs the Cognitive Services OpenAI User role."
+    : "The API key is stored only in the server’s ignored .env file.";
+}
+
+function renderMaiAuthMode() {
+  const entra = $("#mai-auth-mode").value === "entra";
+  $("#mai-api-key-field").classList.toggle("is-hidden", entra);
+  $("#mai-api-key-field input").disabled = entra;
+  $("#mai-auth-help").textContent = entra
+    ? "Uses the same Azure CLI sign-in or managed identity as GPT. The identity needs the Foundry User role."
+    : "The API key is stored only in the server’s ignored .env file.";
 }
 
 async function openSettings() {
@@ -102,12 +122,16 @@ async function openSettings() {
     form.elements.defaultMode.value = settings.defaultMode;
     form.elements.gptEndpoint.value = settings.gpt.endpoint;
     form.elements.gptIdentifier.value = settings.gpt.identifier;
+    form.elements.gptAuthMode.value = settings.gpt.authMode;
     form.elements.gptApiKey.value = "";
     form.elements.maiEndpoint.value = settings.mai.endpoint;
     form.elements.maiIdentifier.value = settings.mai.identifier;
+    form.elements.maiAuthMode.value = settings.mai.authMode;
     form.elements.maiApiKey.value = "";
     $("#gpt-key-hint").textContent = settings.gpt.hasApiKey ? "A key is saved; leave blank to keep it" : "No key saved";
     $("#mai-key-hint").textContent = settings.mai.hasApiKey ? "A key is saved; leave blank to keep it" : "No key saved";
+    renderGptAuthMode();
+    renderMaiAuthMode();
     dialog.showModal();
   } catch (error) {
     showToast(error.message);
@@ -132,8 +156,18 @@ async function saveSettings(event) {
       method: "PUT",
       body: JSON.stringify({
         defaultMode: data.defaultMode,
-        gpt: { endpoint: data.gptEndpoint, identifier: data.gptIdentifier, apiKey: data.gptApiKey },
-        mai: { endpoint: data.maiEndpoint, identifier: data.maiIdentifier, apiKey: data.maiApiKey }
+        gpt: {
+          endpoint: data.gptEndpoint,
+          identifier: data.gptIdentifier,
+          authMode: data.gptAuthMode,
+          apiKey: data.gptApiKey || ""
+        },
+        mai: {
+          endpoint: data.maiEndpoint,
+          identifier: data.maiIdentifier,
+          authMode: data.maiAuthMode,
+          apiKey: data.maiApiKey || ""
+        }
       })
     });
     renderStatus();
@@ -454,6 +488,8 @@ function wireEvents() {
   });
   $("#configure-button").addEventListener("click", openSettings);
   $("#settings-form").addEventListener("submit", saveSettings);
+  $("#gpt-auth-mode").addEventListener("change", renderGptAuthMode);
+  $("#mai-auth-mode").addEventListener("change", renderMaiAuthMode);
   $("#settings-close").addEventListener("click", closeSettings);
   $("#settings-cancel").addEventListener("click", closeSettings);
   document.addEventListener("keydown", (event) => {

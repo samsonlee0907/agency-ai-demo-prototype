@@ -38,9 +38,11 @@ You can alternatively copy `.env.example` to `.env` and edit it manually. Mock r
 | `MODEL_MODE` | `mock` | Initial mode: `mock` or `live` |
 | `PORT` | `3000` | Local HTTP port |
 | `GPT_ENDPOINT` | — | Azure OpenAI resource endpoint |
+| `GPT_AUTH_MODE` | `api-key` | `api-key` or `entra` |
 | `GPT_API_KEY` | — | Server-side Azure OpenAI API key |
 | `GPT_DEPLOYMENT` | `gpt-5.4` | Azure deployment name |
 | `MAI_ENDPOINT` | — | Foundry endpoint; may be a separate resource |
+| `MAI_AUTH_MODE` | `api-key` | `api-key` or `entra` |
 | `MAI_API_KEY` | — | Server-side MAI API key |
 | `MAI_MODEL` | `MAI-Image-2.5` | MAI model/deployment identifier |
 
@@ -59,6 +61,8 @@ client.responses.create({ model: deployment, input: /* ... */ })
 ```
 
 Each workflow requests a strict JSON schema and validates the parsed result with Zod before returning it to the browser.
+
+For resources with key authentication disabled, choose **Microsoft Entra ID** for both providers in the portal. The app uses `DefaultAzureCredential` and the official `https://ai.azure.com/.default` scope. Locally this can use your `az login` session; in Azure it can use managed identity. Assign the active identity the **Foundry User** role on the Foundry resource.
 
 MAI routing is isolated in `src/providers/mai-image.js`, following the route used by the referenced Microsoft model portal:
 

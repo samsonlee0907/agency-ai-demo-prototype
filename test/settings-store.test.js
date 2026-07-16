@@ -8,15 +8,17 @@ import { saveSettings, settingsToEnv } from "../src/settings-store.js";
 test("portal settings preserve saved keys when replacement fields are blank", () => {
   const values = settingsToEnv({
     defaultMode: "live",
-    gpt: { endpoint: "https://gpt.example.com", apiKey: "", identifier: "gpt-5.4" },
-    mai: { endpoint: "https://mai.example.com", apiKey: "new-mai", identifier: "MAI-Image-2.5" }
+    gpt: { endpoint: "https://gpt.example.com", authMode: "entra", apiKey: "", identifier: "gpt-5.4" },
+    mai: { endpoint: "https://mai.example.com", authMode: "api-key", apiKey: "new-mai", identifier: "MAI-Image-2.5" }
   }, {
     gpt: { apiKey: "saved-gpt" },
     mai: { apiKey: "saved-mai" }
   });
 
   assert.equal(values.GPT_API_KEY, "saved-gpt");
+  assert.equal(values.GPT_AUTH_MODE, "entra");
   assert.equal(values.MAI_API_KEY, "new-mai");
+  assert.equal(values.MAI_AUTH_MODE, "api-key");
 });
 
 test("settings persistence replaces managed values and preserves unrelated entries", async (context) => {
@@ -27,9 +29,11 @@ test("settings persistence replaces managed values and preserves unrelated entri
   await saveSettings(envPath, {
     MODEL_MODE: "live",
     GPT_ENDPOINT: "https://gpt.example.com",
+    GPT_AUTH_MODE: "api-key",
     GPT_API_KEY: "secret-gpt",
     GPT_DEPLOYMENT: "gpt-5.4",
     MAI_ENDPOINT: "https://mai.example.com",
+    MAI_AUTH_MODE: "api-key",
     MAI_API_KEY: "secret-mai",
     MAI_MODEL: "MAI-Image-2.5"
   });
@@ -39,9 +43,11 @@ test("settings persistence replaces managed values and preserves unrelated entri
   await saveSettings(envPath, {
     MODEL_MODE: "mock",
     GPT_ENDPOINT: "https://other.example.com",
+    GPT_AUTH_MODE: "entra",
     GPT_API_KEY: "replacement",
     GPT_DEPLOYMENT: "gpt-next",
     MAI_ENDPOINT: "https://mai.example.com",
+    MAI_AUTH_MODE: "entra",
     MAI_API_KEY: "secret-mai",
     MAI_MODEL: "MAI-Image-2.5"
   });

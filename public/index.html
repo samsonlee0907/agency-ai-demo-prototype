@@ -295,6 +295,12 @@
 
       <fieldset>
         <legend>GPT-5.4 · Azure OpenAI Responses API</legend>
+        <label>Authentication
+          <select name="gptAuthMode" id="gpt-auth-mode">
+            <option value="entra">Microsoft Entra ID (recommended)</option>
+            <option value="api-key">API key</option>
+          </select>
+        </label>
         <label>Endpoint
           <input name="gptEndpoint" type="url" placeholder="https://your-resource.openai.azure.com/openai/v1/">
         </label>
@@ -302,15 +308,22 @@
           <label>Deployment
             <input name="gptIdentifier" required value="gpt-5.4">
           </label>
-          <label>API key
+          <label id="gpt-api-key-field">API key
             <input name="gptApiKey" type="password" autocomplete="new-password" placeholder="Enter key">
             <small id="gpt-key-hint">No key saved</small>
           </label>
         </div>
+        <p class="auth-help" id="gpt-auth-help"></p>
       </fieldset>
 
       <fieldset>
         <legend>MAI-Image-2.5 · Microsoft Foundry</legend>
+        <label>Authentication
+          <select name="maiAuthMode" id="mai-auth-mode">
+            <option value="entra">Microsoft Entra ID (recommended)</option>
+            <option value="api-key">API key</option>
+          </select>
+        </label>
         <label>Endpoint
           <input name="maiEndpoint" type="url" placeholder="https://your-resource.services.ai.azure.com">
         </label>
@@ -318,11 +331,12 @@
           <label>Model / deployment
             <input name="maiIdentifier" required value="MAI-Image-2.5">
           </label>
-          <label>API key
+          <label id="mai-api-key-field">API key
             <input name="maiApiKey" type="password" autocomplete="new-password" placeholder="Enter key">
             <small id="mai-key-hint">No key saved</small>
           </label>
         </div>
+        <p class="auth-help" id="mai-auth-help"></p>
       </fieldset>
 
       <div class="dialog-error" id="settings-error" role="alert" hidden></div>

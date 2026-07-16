@@ -1,3 +1,5 @@
+import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
+
 export function buildMaiGenerationUrl(endpoint) {
   return `${String(endpoint).replace(/\/+$/, "")}/mai/v1/images/generations`;
 }
@@ -13,15 +15,22 @@ export function extractMaiImage(payload) {
 export function createMaiImageProvider(config) {
   if (!config.configured) return null;
 
+  const tokenProvider = config.authMode === "entra"
+    ? getBearerTokenProvider(new DefaultAzureCredential(), "https://ai.azure.com/.default")
+    : null;
+
   return {
     async generate({ prompt, width, height }) {
       let response;
       try {
+        const authHeaders = tokenProvider
+          ? { Authorization: `Bearer ${await tokenProvider()}` }
+          : { "api-key": config.apiKey };
         response = await fetch(buildMaiGenerationUrl(config.endpoint), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "api-key": config.apiKey
+            ...authHeaders
           },
           body: JSON.stringify({
             model: config.model,

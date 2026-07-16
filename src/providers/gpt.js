@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 import {
   matchJsonSchema,
   matchOutputSchema,
@@ -37,8 +38,11 @@ function parseJsonOutput(text, schema) {
 export function createGptProvider(config) {
   if (!config.configured) return null;
 
+  const apiKey = config.authMode === "entra"
+    ? getBearerTokenProvider(new DefaultAzureCredential(), "https://ai.azure.com/.default")
+    : config.apiKey;
   const client = new OpenAI({
-    apiKey: config.apiKey,
+    apiKey,
     baseURL: config.endpoint,
     timeout: 120000,
     maxRetries: 1
@@ -69,7 +73,14 @@ export function createGptProvider(config) {
         }
       });
     } catch (error) {
-      throw new ModelResponseError(`GPT request failed: ${error.message}`, error);
+      const keyAuthDisabled = error.status === 403 && /key based authentication is disabled/i.test(error.message);
+      const roleDenied = config.authMode === "entra" && error.status === 403;
+      const message = keyAuthDisabled
+        ? "This resource disables API keys. Open Live Foundry settings and select Microsoft Entra ID authentication."
+        : roleDenied
+          ? "Microsoft Entra ID was authenticated but is not authorized for inference. Assign this identity the Cognitive Services OpenAI User role on the resource, then retry."
+          : error.message;
+      throw new ModelResponseError(`GPT request failed: ${message}`, error);
     }
 
     return parseJsonOutput(response.output_text, outputSchema);

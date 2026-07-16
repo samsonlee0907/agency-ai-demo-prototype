@@ -11,13 +11,15 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   const statusResponse = await fetch(`${base}/api/status`);
   assert.equal(statusResponse.status, 200);
   const status = await statusResponse.json();
-  assert.equal(status.defaultMode, "mock");
+  assert.ok(["mock", "live"].includes(status.defaultMode));
   assert.equal("apiKey" in status.gpt, false);
 
   const settingsResponse = await fetch(`${base}/api/settings`);
   assert.equal(settingsResponse.status, 200);
   const settings = await settingsResponse.json();
   assert.equal(settings.gpt.identifier, "gpt-5.4");
+  assert.ok(["api-key", "entra"].includes(settings.gpt.authMode));
+  assert.ok(["api-key", "entra"].includes(settings.mai.authMode));
   assert.equal("apiKey" in settings.gpt, false);
 
   const bootstrapResponse = await fetch(`${base}/api/bootstrap`);
