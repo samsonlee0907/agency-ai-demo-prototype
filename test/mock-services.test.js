@@ -28,7 +28,11 @@ test("marketing mock uses selected property and campaign settings", () => {
     tone: "Refined editorial"
   });
 
-  assert.match(campaign.headline, /Atelier Residence/);
+  assert.equal(campaign.campaignConcept, "Volume with warmth");
+  assert.equal(campaign.headline, "Space, with a point of view");
+  assert.match(campaign.strapline, /Surry Hills/);
+  assert.match(campaign.description, /warehouse past/i);
+  assert.match(campaign.callToAction, /private inspection/i);
   assert.match(campaign.imagePrompt, /Surry Hills/);
   assert.match(campaign.imagePrompt, /Preserve the exact property/);
   assert.equal(campaign.highlights.length, 4);

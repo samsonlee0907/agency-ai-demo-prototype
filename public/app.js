@@ -545,12 +545,16 @@ function renderCampaign(imageResult = null) {
       <div class="campaign-hero">
         <img src="${escapeHtml(imageUrl)}" alt="Campaign visual for ${escapeHtml(property.name)}">
         <div class="campaign-overlay">
-          <p class="eyebrow">${escapeHtml(property.location)}</p>
+          <p class="eyebrow">${escapeHtml(campaign.campaignConcept)} · ${escapeHtml(property.location)}</p>
           <h3>${escapeHtml(campaign.headline)}</h3>
+          <p class="campaign-strapline">${escapeHtml(campaign.strapline)}</p>
         </div>
       </div>
       <div class="campaign-body">
-        <div class="campaign-copy"><p>${escapeHtml(campaign.description)}</p></div>
+        <div class="campaign-copy">
+          <p>${escapeHtml(campaign.description)}</p>
+          <div class="campaign-cta"><span>Invitation</span><strong>${escapeHtml(campaign.callToAction)}</strong></div>
+        </div>
         <div class="campaign-side">
           <p class="eyebrow">Property highlights</p>
           <ul class="highlight-list">${campaign.highlights.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
@@ -576,6 +580,7 @@ function renderCampaign(imageResult = null) {
           <span>${actionLabel}</span>
         </button>
       </div>
+      <div class="image-feedback" id="image-feedback" role="alert" hidden></div>
     </article>
   `;
   $$("#marketing-output [data-copy]").forEach((button) => button.addEventListener("click", () => copyText(button.dataset.copy)));
@@ -595,6 +600,7 @@ function updateImageButton() {
 async function generateImage() {
   const button = $("#generate-image-button");
   const campaign = state.marketing;
+  $("#image-feedback").hidden = true;
   setButtonLoading(button, true, "Brushing up with MAI…");
   try {
     const result = await api("/api/image", {
@@ -609,6 +615,10 @@ async function generateImage() {
     renderCampaign(result);
     showToast(result.generated ? "Base photograph polished for the campaign." : "Mock enhancement preview applied.");
   } catch (error) {
+    if (state.marketing !== campaign) return;
+    const feedback = $("#image-feedback");
+    feedback.innerHTML = `<strong>MAI image edit did not complete.</strong><span>${escapeHtml(error.message)}</span><small>The original property photograph is unchanged. Retry when the service is available.</small>`;
+    feedback.hidden = false;
     showToast(error.message);
     setButtonLoading(button, false);
   }

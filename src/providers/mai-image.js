@@ -16,6 +16,23 @@ export function extractMaiImage(payload) {
   return image;
 }
 
+export function getMaiRetryDelayMs(headers, fallbackMs = 65000) {
+  const millisecondsHeader = headers.get("x-ms-retry-after-ms") ?? headers.get("retry-after-ms");
+  const milliseconds = Number(millisecondsHeader);
+  if (millisecondsHeader !== null && Number.isFinite(milliseconds) && milliseconds >= 0) {
+    return Math.min(milliseconds, 120000);
+  }
+
+  const retryAfter = headers.get("retry-after");
+  const seconds = Number(retryAfter);
+  if (retryAfter !== null && Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(seconds * 1000, 120000);
+  }
+  const retryDate = retryAfter ? Date.parse(retryAfter) : NaN;
+  if (Number.isFinite(retryDate)) return Math.min(Math.max(retryDate - Date.now(), 1000), 120000);
+  return Math.min(Math.max(fallbackMs, 0), 120000);
+}
+
 export function createMaiImageProvider(config) {
   if (!config.configured) return null;
 
@@ -38,11 +55,33 @@ export function createMaiImageProvider(config) {
     return extractMaiImage(payload);
   }
 
+  async function fetchWithRetry(request) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let response;
+      try {
+        response = await request();
+      } catch (error) {
+        if (attempt === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+          continue;
+        }
+        throw error;
+      }
+
+      const retryable = response.status === 429 || response.status >= 500;
+      if (!retryable || attempt === 1) return response;
+      const delayMs = response.status === 429 ? getMaiRetryDelayMs(response.headers) : 2000;
+      await response.body?.cancel();
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    throw new Error("MAI request exhausted its retry attempts.");
+  }
+
   return {
     async generate({ prompt, width, height }) {
       let response;
       try {
-        response = await fetch(buildMaiGenerationUrl(config.endpoint), {
+        response = await fetchWithRetry(async () => fetch(buildMaiGenerationUrl(config.endpoint), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -55,7 +94,7 @@ export function createMaiImageProvider(config) {
             height
           }),
           signal: AbortSignal.timeout(120000)
-        });
+        }));
       } catch (error) {
         throw new Error(`MAI request failed: ${error.message}`, { cause: error });
       }
@@ -76,12 +115,12 @@ export function createMaiImageProvider(config) {
 
       let response;
       try {
-        response = await fetch(buildMaiEditUrl(config.endpoint), {
+        response = await fetchWithRetry(async () => fetch(buildMaiEditUrl(config.endpoint), {
           method: "POST",
           headers: await getAuthHeaders(),
           body: form,
           signal: AbortSignal.timeout(300000)
-        });
+        }));
       } catch (error) {
         throw new Error(`MAI edit request failed: ${error.message}`, { cause: error });
       }

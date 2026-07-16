@@ -430,8 +430,12 @@ select:focus, textarea:focus, input:focus, button:focus-visible { border-color: 
 .campaign-overlay { position: absolute; inset: 0; display: flex; justify-content: flex-end; flex-direction: column; padding: 35px; background: linear-gradient(transparent 15%, rgba(6,18,27,.8)); }
 .campaign-overlay .eyebrow { color: var(--gold-light); }
 .campaign-overlay h3 { max-width: 680px; margin: 0; font-family: var(--serif); font-size: 38px; font-weight: 400; line-height: 1.05; }
+.campaign-strapline { max-width: 620px; margin: 10px 0 0; color: #e8ecee; font-family: var(--serif); font-size: 13px; line-height: 1.5; }
 .campaign-body { display: grid; grid-template-columns: 1.2fr .8fr; gap: 34px; padding: 30px 35px 34px; }
 .campaign-copy > p { margin: 0; color: var(--navy-soft); font-family: var(--serif); font-size: 14px; line-height: 1.75; white-space: pre-line; }
+.campaign-cta { display: grid; gap: 4px; margin-top: 20px; padding: 13px 15px; border-left: 2px solid var(--gold); background: var(--ivory); }
+.campaign-cta span { color: var(--gold-ink); font-size: 7px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.campaign-cta strong { color: var(--navy-soft); font-size: 9px; line-height: 1.45; }
 .campaign-side { padding-left: 26px; border-left: 1px solid var(--line); }
 .campaign-side h4, .social-card h4, .prompt-card h4 { margin: 0 0 10px; font-family: var(--serif); font-size: 16px; font-weight: 500; }
 .highlight-list { margin: 0; padding: 0; list-style: none; }
@@ -444,6 +448,11 @@ select:focus, textarea:focus, input:focus, button:focus-visible { border-color: 
 .image-source { display: flex; align-items: center; gap: 10px; color: var(--ink-muted); font-size: 9px; }
 .image-source img { width: 54px; height: 42px; border: 1px solid var(--line); object-fit: cover; }
 .image-source strong { display: block; margin-bottom: 2px; color: var(--navy); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+.image-feedback { display: grid; gap: 4px; margin: 0 35px 35px; padding: 13px 15px; border: 1px solid #e3b9b1; background: #fff4f1; color: var(--error); }
+.image-feedback[hidden] { display: none; }
+.image-feedback strong { font-size: 9px; }
+.image-feedback span, .image-feedback small { font-size: 8px; line-height: 1.45; }
+.image-feedback small { color: var(--ink-muted); }
 
 .advisory-output { min-width: 0; padding: 30px; background: var(--paper); }
 .report-placeholder { display: grid; width: 175px; height: 210px; gap: 15px; padding: 25px; border: 1px solid var(--line); background: var(--paper); box-shadow: var(--shadow); transform: rotate(-1deg); }

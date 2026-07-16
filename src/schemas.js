@@ -52,10 +52,13 @@ export const marketingRequestSchema = z.object({
 });
 
 export const marketingOutputSchema = z.object({
-  headline: z.string().min(5).max(140),
-  description: z.string().min(30).max(1400),
-  socialCopy: z.string().min(10).max(700),
+  campaignConcept: z.string().min(3).max(80),
+  headline: z.string().min(5).max(100),
+  strapline: z.string().min(10).max(180),
+  description: z.string().min(120).max(1800),
+  socialCopy: z.string().min(40).max(900),
   highlights: z.array(z.string()).min(3).max(6),
+  callToAction: z.string().min(5).max(140),
   imagePrompt: z.string().min(20).max(1200)
 });
 
@@ -323,12 +326,15 @@ export const matchJsonSchema = {
 export const marketingJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["headline", "description", "socialCopy", "highlights", "imagePrompt"],
+  required: ["campaignConcept", "headline", "strapline", "description", "socialCopy", "highlights", "callToAction", "imagePrompt"],
   properties: {
+    campaignConcept: { type: "string" },
     headline: { type: "string" },
+    strapline: { type: "string" },
     description: { type: "string" },
     socialCopy: { type: "string" },
     highlights: { type: "array", items: { type: "string" }, minItems: 3, maxItems: 6 },
+    callToAction: { type: "string" },
     imagePrompt: { type: "string" }
   }
 };

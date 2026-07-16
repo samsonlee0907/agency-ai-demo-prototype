@@ -89,23 +89,67 @@ export function matchProperties(brief) {
 }
 
 const toneWords = {
-  "Refined editorial": "considered",
-  "Warm and inviting": "welcoming",
-  "Confident luxury": "exceptional",
-  "Direct and modern": "distinctive"
+  "Refined editorial": "quietly assured",
+  "Warm and inviting": "warmly composed",
+  "Confident luxury": "confidently resolved",
+  "Direct and modern": "cleanly expressed"
+};
+
+const campaignDirections = {
+  "harbour-house": {
+    concept: "Harbour, held lightly",
+    headline: "Room for every horizon",
+    strapline: "A composed Double Bay home that keeps family life, village rhythm and the harbour in easy reach.",
+    opening: "Morning light, a glimpse of blue and the village already stirring nearby: Harbour House begins with the pleasures that make Double Bay feel effortless to live in."
+  },
+  "atelier-residence": {
+    concept: "Volume with warmth",
+    headline: "Space, with a point of view",
+    strapline: "Warehouse character and finely judged detail create a Surry Hills home of genuine presence.",
+    opening: "Behind its retained brick facade, The Atelier Residence opens into a home shaped by height, light and the honest texture of its warehouse past."
+  },
+  "palm-court": {
+    concept: "House-like ease",
+    headline: "Turn toward the light",
+    strapline: "North-facing rooms and a private courtyard give this Mosman townhouse the ease of a freestanding home.",
+    opening: "Palm Court is oriented to the way a home should feel: sun arriving from the north, doors opening to the courtyard and each room settling naturally into the next."
+  },
+  "coastline-pavilion": {
+    concept: "Life at the edge",
+    headline: "Follow the light home",
+    strapline: "A layered Bronte residence that places ocean outlook, family space and the beach within one daily rhythm.",
+    opening: "At Coastline Pavilion, ocean light moves through the house from morning onward, drawing family life across generous rooms and out to layered terraces."
+  },
+  gardenia: {
+    concept: "Old soul, new rhythm",
+    headline: "History, beautifully lived",
+    strapline: "Victorian character and a calm contemporary interior meet behind one of Woollahra’s classic facades.",
+    opening: "Gardenia keeps the details that give a Victorian terrace its soul, then makes space for the clarity, light and connection of contemporary life."
+  },
+  "skyline-penthouse": {
+    concept: "Above the tempo",
+    headline: "Sydney, from a quieter angle",
+    strapline: "Harbour outlook and considered interiors create a private counterpoint to the energy of Barangaroo below.",
+    opening: "The city is present here, but never pressing: Skyline Penthouse frames Sydney through broad glass, a practical balcony and rooms composed around the view."
+  }
 };
 
 export function generateMarketing(propertyId, settings) {
   const property = findListing(propertyId);
-  const toneWord = toneWords[settings.tone] || "considered";
+  const direction = campaignDirections[property.id];
+  const toneWord = toneWords[settings.tone] || "quietly assured";
   const audience = settings.audience.toLowerCase();
-  const featureLead = property.features.slice(0, 3).join(", ");
+  const featureLead = property.features.slice(0, 3).map((feature) => feature.toLowerCase()).join(", ");
+  const instagram = settings.channel === "Instagram";
 
   return {
-    headline: `${property.name} — ${toneWord} living in ${property.area}`,
-    description: `For ${audience}, ${property.name} offers a rare sense of arrival in one of ${property.area}'s most desirable settings. ${property.description} Across ${property.beds} bedrooms and ${property.baths} beautifully appointed bathrooms, every space has been shaped for an easy, elevated rhythm of life. ${featureLead} complete a home of enduring appeal.`,
-    socialCopy: `A new perspective on ${property.area}. ${property.name} pairs ${property.features[0].toLowerCase()} with ${property.features[1].toLowerCase()} — designed for ${audience}. ${formatMoney(property.price)} · ${property.beds} bed · ${property.baths} bath. #SydneyProperty #${property.area.replace(/\s/g, "")}`,
+    campaignConcept: direction.concept,
+    headline: direction.headline,
+    strapline: direction.strapline,
+    description: `${direction.opening}\n\n${property.description} Across ${property.beds} bedrooms and ${property.baths} bathrooms, the plan gives ${audience} room to gather, work and retreat without losing connection to ${property.area}. ${property.features[0]} and ${property.features[1].toLowerCase()} shape the everyday experience, while ${property.features[2].toLowerCase()} keeps the wider neighbourhood close. The result is ${toneWord}: a home defined by how naturally its setting and spaces work together.`,
+    socialCopy: `${direction.headline}. ${direction.strapline} Explore ${property.name}: ${property.beds} bedrooms, ${property.baths} bathrooms, ${featureLead}, and a guide of ${formatMoney(property.price)}. Contact the Aurelia team to arrange a considered inspection.${instagram ? ` #SydneyProperty #${property.area.replace(/\s/g, "")}` : ""}`,
     highlights: property.features.slice(0, 4),
+    callToAction: `Arrange a private inspection of ${property.name} with the Aurelia ${property.area} team.`,
     imagePrompt: `Polish the supplied base photograph of ${property.name} in ${property.area} for a ${settings.channel.toLowerCase()} campaign aimed at ${audience}. Preserve the exact property and camera composition. Gently emphasise ${property.features.slice(0, 3).join(", ").toLowerCase()} through natural light, balanced exposure and restrained editorial colour. Keep materials and architecture authentic; no added features, people or text.`
   };
 }

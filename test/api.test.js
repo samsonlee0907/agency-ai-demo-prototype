@@ -62,6 +62,24 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   const matches = await matchResponse.json();
   assert.equal(matches.results[0].id, "harbour-house");
 
+  const marketingResponse = await fetch(`${base}/api/marketing`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "mock",
+      propertyId: "harbour-house",
+      settings: {
+        audience: "Established families",
+        channel: "Digital campaign",
+        tone: "Refined editorial"
+      }
+    })
+  });
+  assert.equal(marketingResponse.status, 200);
+  const marketing = await marketingResponse.json();
+  assert.equal(marketing.campaignConcept, "Harbour, held lightly");
+  assert.match(marketing.callToAction, /private inspection/i);
+
   const valuationResponse = await fetch(`${base}/api/valuation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
