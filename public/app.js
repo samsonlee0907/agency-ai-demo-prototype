@@ -535,13 +535,54 @@ function renderCampaign(imageResult = null) {
   const campaign = state.marketing;
   const property = listingById(campaign.propertyId);
   const imageUrl = imageResult?.imageUrl || property.image;
-  const modelLabel = imageResult?.model
-    ? `Campaign edit · ${imageResult.model}`
+  const hasImageEdit = Boolean(imageResult);
+  const editedImageClass = imageResult && !imageResult.generated ? " comparison-image-mock" : "";
+  const imageStatusTitle = imageResult ? "Comparison ready" : "Source photograph";
+  const modelLabel = imageResult
+    ? imageResult.generated
+      ? `Campaign edit · ${imageResult.model} · original preserved`
+      : "Mock image-grade preview · original preserved"
     : "Authentic base photograph · generated with MAI-Image-2.5";
   const actionLabel = imageResult ? "Regenerate campaign edit" : "Brush up base image";
-
-  $("#marketing-output").innerHTML = `
-    <article class="campaign">
+  const campaignVisual = hasImageEdit
+    ? `
+      <section class="campaign-comparison" aria-labelledby="image-comparison-title">
+        <div class="comparison-heading">
+          <div>
+            <p class="eyebrow">Image transformation</p>
+            <h3 id="image-comparison-title">Before and after</h3>
+          </div>
+          <p>The campaign edit refines light, exposure and tone while preserving the property, landscaping and camera position.</p>
+        </div>
+        <div class="comparison-grid">
+          <figure>
+            <div class="comparison-image">
+              <img src="${escapeHtml(property.image)}" alt="Original photograph of ${escapeHtml(property.name)}">
+              <span>Before</span>
+            </div>
+            <figcaption><strong>Authentic base photograph</strong><span>Original architecture and natural conditions</span></figcaption>
+          </figure>
+          <figure>
+            <div class="comparison-image${editedImageClass}">
+              <img src="${escapeHtml(imageUrl)}" alt="Campaign-edited photograph of ${escapeHtml(property.name)}">
+              <span>After</span>
+            </div>
+            <figcaption><strong>Campaign-ready edit</strong><span>${escapeHtml(imageResult.model)}</span></figcaption>
+          </figure>
+        </div>
+        <div class="comparison-changes" aria-label="Image changes">
+          <span>Natural light refined</span>
+          <span>Exposure balanced</span>
+          <span>Editorial colour grade</span>
+          <span>Property preserved</span>
+        </div>
+        <div class="campaign-message">
+          <p class="eyebrow">${escapeHtml(campaign.campaignConcept)} · ${escapeHtml(property.location)}</p>
+          <h3>${escapeHtml(campaign.headline)}</h3>
+          <p>${escapeHtml(campaign.strapline)}</p>
+        </div>
+      </section>`
+    : `
       <div class="campaign-hero">
         <img src="${escapeHtml(imageUrl)}" alt="Campaign visual for ${escapeHtml(property.name)}">
         <div class="campaign-overlay">
@@ -549,7 +590,11 @@ function renderCampaign(imageResult = null) {
           <h3>${escapeHtml(campaign.headline)}</h3>
           <p class="campaign-strapline">${escapeHtml(campaign.strapline)}</p>
         </div>
-      </div>
+      </div>`;
+
+  $("#marketing-output").innerHTML = `
+    <article class="campaign">
+      ${campaignVisual}
       <div class="campaign-body">
         <div class="campaign-copy">
           <p>${escapeHtml(campaign.description)}</p>
@@ -573,7 +618,7 @@ function renderCampaign(imageResult = null) {
       <div class="image-actions">
         <div class="image-source">
           <img src="${escapeHtml(property.image)}" alt="">
-          <span><strong>Source photograph</strong>${escapeHtml(modelLabel)}</span>
+          <span><strong>${imageStatusTitle}</strong>${escapeHtml(modelLabel)}</span>
         </div>
         <button class="button button-gold" type="button" id="generate-image-button" data-action-label="${actionLabel}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M16 9h.01"/></svg>
