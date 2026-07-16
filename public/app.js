@@ -538,10 +538,15 @@ function renderCampaign(imageResult = null) {
   const hasImageEdit = Boolean(imageResult);
   const editedImageClass = imageResult && !imageResult.generated ? " comparison-image-mock" : "";
   const imageStatusTitle = imageResult ? "Comparison ready" : "Source photograph";
+  const activeImagePrompt = imageResult?.prompt || campaign.imagePrompt;
+  const liveImageEdit = imageResult?.mode === "live" && imageResult.generated;
+  const provenanceLabel = liveImageEdit
+    ? `Live Foundry · edited by ${imageResult.model}`
+    : "Mock data · simulated grade only · MAI was not called";
   const modelLabel = imageResult
-    ? imageResult.generated
+    ? liveImageEdit
       ? `Campaign edit · ${imageResult.model} · original preserved`
-      : "Mock image-grade preview · original preserved"
+      : "Mock image-grade preview · no model call · original preserved"
     : "Authentic base photograph · generated with MAI-Image-2.5";
   const actionLabel = imageResult ? "Regenerate campaign edit" : "Brush up base image";
   const campaignVisual = hasImageEdit
@@ -552,7 +557,10 @@ function renderCampaign(imageResult = null) {
             <p class="eyebrow">Image transformation</p>
             <h3 id="image-comparison-title">Before and after</h3>
           </div>
-          <p>The campaign edit refines light, exposure and tone while preserving the property, landscaping and camera position.</p>
+          <div class="comparison-provenance">
+            <span class="${liveImageEdit ? "is-live" : "is-mock"}">${escapeHtml(provenanceLabel)}</span>
+            <p>The campaign edit refines light, exposure and tone while preserving the property, landscaping and camera position.</p>
+          </div>
         </div>
         <div class="comparison-grid">
           <figure>
@@ -567,7 +575,10 @@ function renderCampaign(imageResult = null) {
               <img src="${escapeHtml(imageUrl)}" alt="Campaign-edited photograph of ${escapeHtml(property.name)}">
               <span>After</span>
             </div>
-            <figcaption><strong>Campaign-ready edit</strong><span>${escapeHtml(imageResult.model)}</span></figcaption>
+            <figcaption>
+              <strong>${liveImageEdit ? "Campaign-ready MAI edit" : "Simulated campaign preview"}</strong>
+              <span>${escapeHtml(provenanceLabel)}</span>
+            </figcaption>
           </figure>
         </div>
         <div class="comparison-changes" aria-label="Image changes">
@@ -611,8 +622,11 @@ function renderCampaign(imageResult = null) {
           <h4>Social copy</h4><p>${escapeHtml(campaign.socialCopy)}</p>
         </div>
         <div class="prompt-card">
-          <button class="copy-mini" type="button" data-copy="${escapeHtml(campaign.imagePrompt)}">Copy</button>
-          <h4>Image direction</h4><p>${escapeHtml(campaign.imagePrompt)}</p>
+          <button class="copy-mini" type="button" data-copy-target="#image-edit-prompt">Copy</button>
+          <h4>Image edit prompt</h4>
+          <label class="prompt-editor-label" for="image-edit-prompt">Editable direction sent to the image service</label>
+          <textarea id="image-edit-prompt" maxlength="2000" rows="7" aria-describedby="image-prompt-help">${escapeHtml(activeImagePrompt)}</textarea>
+          <small id="image-prompt-help">Adjust the lighting, season, staging or campaign mood. The server always adds safeguards that preserve the property itself.</small>
         </div>
       </div>
       <div class="image-actions">
@@ -629,6 +643,9 @@ function renderCampaign(imageResult = null) {
     </article>
   `;
   $$("#marketing-output [data-copy]").forEach((button) => button.addEventListener("click", () => copyText(button.dataset.copy)));
+  $$("#marketing-output [data-copy-target]").forEach((button) => button.addEventListener("click", () => {
+    copyText($(button.dataset.copyTarget).value);
+  }));
   $("#generate-image-button").addEventListener("click", generateImage);
   updateImageButton();
 }
@@ -645,23 +662,34 @@ function updateImageButton() {
 async function generateImage() {
   const button = $("#generate-image-button");
   const campaign = state.marketing;
-  $("#image-feedback").hidden = true;
-  setButtonLoading(button, true, "Brushing up with MAI…");
+  const feedback = $("#image-feedback");
+  const promptField = $("#image-edit-prompt");
+  const prompt = promptField.value.trim();
+  feedback.hidden = true;
+  if (prompt.length < 20) {
+    feedback.innerHTML = "<strong>Add more image direction.</strong><span>Describe the intended lighting, tone or presentation in at least 20 characters.</span>";
+    feedback.hidden = false;
+    promptField.focus();
+    return;
+  }
+
+  setButtonLoading(button, true, state.mode === "live" ? "Editing with MAI…" : "Applying mock preview…");
+  promptField.disabled = true;
   try {
     const result = await api("/api/image", {
       method: "POST",
       body: JSON.stringify({
         mode: state.mode,
         propertyId: campaign.propertyId,
-        prompt: campaign.imagePrompt
+        prompt
       })
     });
     if (state.marketing !== campaign) return;
     renderCampaign(result);
-    showToast(result.generated ? "Base photograph polished for the campaign." : "Mock enhancement preview applied.");
+    showToast(result.generated ? `Edited by ${result.model} in Live Foundry mode.` : "Mock preview applied. MAI was not called.");
   } catch (error) {
     if (state.marketing !== campaign) return;
-    const feedback = $("#image-feedback");
+    promptField.disabled = false;
     feedback.innerHTML = `<strong>MAI image edit did not complete.</strong><span>${escapeHtml(error.message)}</span><small>The original property photograph is unchanged. Retry when the service is available.</small>`;
     feedback.hidden = false;
     showToast(error.message);

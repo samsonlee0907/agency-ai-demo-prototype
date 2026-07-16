@@ -242,7 +242,7 @@ app.post("/api/image", async (request, response, next) => {
           mimeType: path.extname(sourcePath).toLowerCase() === ".jpg" ? "image/jpeg" : "image/png"
         })
       : getMockImage(propertyId, prompt);
-    response.json({ mode, propertyId, ...output });
+    response.json({ mode, propertyId, ...output, prompt });
   } catch (error) {
     next(error);
   }

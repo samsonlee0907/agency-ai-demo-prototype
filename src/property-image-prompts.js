@@ -25,7 +25,7 @@ export function createCampaignEditPrompt(direction) {
   return [
     "Edit the supplied property photograph rather than inventing a different property.",
     "Preserve the exact building identity, architecture, massing, windows, materials, landscaping, room layout and camera position.",
-    "Apply only restrained campaign polish: improve exposure, natural light, colour balance, clarity and presentation, with subtle editorial finishing.",
+    "Apply the requested campaign direction with a clearly visible but still authentic change to exposure, natural light, colour balance, clarity, staging or atmosphere.",
     "Do not add rooms, pools, views, structures or features that are not visible in the source. Do not make the property more luxurious or dramatic than it is.",
     direction,
     "Return a photorealistic real-estate campaign image with no people, text, logos or watermark."

@@ -80,6 +80,21 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.equal(marketing.campaignConcept, "Harbour, held lightly");
   assert.match(marketing.callToAction, /private inspection/i);
 
+  const editedPrompt = "Use brighter late-afternoon light and a warmer editorial colour grade.";
+  const imageResponse = await fetch(`${base}/api/image`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "mock",
+      propertyId: "harbour-house",
+      prompt: editedPrompt
+    })
+  });
+  assert.equal(imageResponse.status, 200);
+  const image = await imageResponse.json();
+  assert.equal(image.generated, false);
+  assert.equal(image.prompt, editedPrompt);
+
   const valuationResponse = await fetch(`${base}/api/valuation`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
