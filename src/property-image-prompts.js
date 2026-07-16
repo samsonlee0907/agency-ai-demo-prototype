@@ -27,7 +27,8 @@ export function createCampaignEditPrompt(direction) {
     "Preserve the exact building identity, architecture, massing, windows, materials, landscaping, room layout and camera position.",
     "Apply the requested campaign direction with a clearly visible but still authentic change to exposure, natural light, colour balance, clarity, staging or atmosphere.",
     "Do not add rooms, pools, views, structures or features that are not visible in the source. Do not make the property more luxurious or dramatic than it is.",
+    "When the requested direction explicitly asks for temporary campaign elements such as people, furniture, vehicles, plants or decorations, add them naturally without obscuring the property or implying they are included in the sale.",
     direction,
-    "Return a photorealistic real-estate campaign image with no people, text, logos or watermark."
+    "Return a photorealistic real-estate campaign image with no text, logos or watermark."
   ].join(" ");
 }

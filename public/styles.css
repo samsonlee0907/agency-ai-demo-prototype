@@ -472,6 +472,9 @@ select:focus, textarea:focus, input:focus, button:focus-visible { border-color: 
 .prompt-card textarea { min-height: 145px; background: var(--paper); font-size: 10px; line-height: 1.55; }
 .prompt-card textarea:disabled { background: #eee9df; color: var(--ink-muted); cursor: wait; }
 .prompt-card small { display: block; margin-top: 8px; color: var(--ink-muted); font-size: 8px; line-height: 1.5; }
+.prompt-safeguards { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 9px; }
+.prompt-safeguards summary { color: var(--navy-soft); font-size: 8px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; cursor: pointer; }
+.prompt-safeguards ul { margin: 8px 0 0; padding-left: 16px; color: var(--ink-muted); font-size: 8px; line-height: 1.65; }
 .copy-mini { position: absolute; top: 14px; right: 14px; padding: 5px 7px; border: 1px solid var(--line); background: var(--paper); font-size: 7px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
 .image-actions { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 0 35px 35px; }
 .image-source { display: flex; align-items: center; gap: 10px; color: var(--ink-muted); font-size: 9px; }

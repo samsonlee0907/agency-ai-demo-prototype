@@ -626,7 +626,16 @@ function renderCampaign(imageResult = null) {
           <h4>Image edit prompt</h4>
           <label class="prompt-editor-label" for="image-edit-prompt">Editable direction sent to the image service</label>
           <textarea id="image-edit-prompt" maxlength="2000" rows="7" aria-describedby="image-prompt-help">${escapeHtml(activeImagePrompt)}</textarea>
-          <small id="image-prompt-help">Adjust the lighting, season, staging or campaign mood. The server always adds safeguards that preserve the property itself.</small>
+          <small id="image-prompt-help">Adjust lighting, season, staging, people or campaign mood. Explicitly requested temporary elements are allowed.</small>
+          <details class="prompt-safeguards">
+            <summary>Server-added safeguards</summary>
+            <ul>
+              <li>Preserve the building, landscaping and camera position.</li>
+              <li>Allow requested people, staging, vehicles, plants or decorations.</li>
+              <li>Do not invent permanent rooms, pools, views or structures.</li>
+              <li>Keep the result photorealistic and free of text, logos and watermarks.</li>
+            </ul>
+          </details>
         </div>
       </div>
       <div class="image-actions">
