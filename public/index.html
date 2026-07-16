@@ -42,16 +42,16 @@
     <div class="hero-copy">
       <p class="eyebrow"><span></span> AI for agency &amp; brokerage</p>
       <h1>From enquiry to exchange,<br><em>intelligence at every step.</em></h1>
-      <p class="hero-lede">Three focused experiences that help property teams advise with precision, create with distinction and respond at the right moment.</p>
+      <p class="hero-lede">Six focused experiences that help property teams advise with precision, create with distinction and respond at the right moment.</p>
       <div class="hero-proof">
-        <div><strong>3</strong><span>connected workflows</span></div>
+        <div><strong>6</strong><span>connected workflows</span></div>
         <div><strong>24/7</strong><span>responsive experiences</span></div>
         <div><strong>2</strong><span>specialist AI models</span></div>
       </div>
     </div>
     <div class="hero-art" aria-hidden="true">
-      <div class="art-frame art-main"><img src="/assets/harbour-house.svg" alt=""></div>
-      <div class="art-frame art-detail"><img src="/assets/atelier-residence.svg" alt=""></div>
+      <div class="art-frame art-main"><img src="/assets/properties/harbour-house.png" alt=""></div>
+      <div class="art-frame art-detail"><img src="/assets/properties/atelier-residence.png" alt=""></div>
       <div class="art-note">
         <span>Curated intelligence</span>
         <strong>Built around the property journey</strong>
@@ -74,6 +74,21 @@
     <button class="demo-tab" type="button" data-demo="leads" aria-controls="leads" aria-selected="false">
       <span class="tab-number">03</span>
       <span><strong>Lead qualification</strong><small>Know who to call, when and why</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <button class="demo-tab" type="button" data-demo="valuation" aria-controls="valuation" aria-selected="false">
+      <span class="tab-number">04</span>
+      <span><strong>Valuation copilot</strong><small>Turn evidence into a valuer-ready draft</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <button class="demo-tab" type="button" data-demo="lease" aria-controls="lease" aria-selected="false">
+      <span class="tab-number">05</span>
+      <span><strong>Lease abstraction</strong><small>Surface terms, dates and obligations</small></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+    </button>
+    <button class="demo-tab" type="button" data-demo="assistant" aria-controls="assistant" aria-selected="false">
+      <span class="tab-number">06</span>
+      <span><strong>Tenant assistant</strong><small>Answer, triage and coordinate 24/7</small></span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
     </button>
   </nav>
@@ -169,7 +184,7 @@
           <p class="eyebrow">02 / Marketing content studio</p>
           <h2 id="marketing-title">One property. A complete campaign.</h2>
         </div>
-        <p>Shape the narrative, adapt it for the channel and create an image direction—all grounded in the property’s real attributes.</p>
+        <p>Shape the narrative, adapt it for the channel and brush up the property’s authentic base photograph—without changing the building itself.</p>
       </div>
 
       <div class="workspace studio-workspace">
@@ -259,6 +274,154 @@
             <h4>Select an enquiry</h4>
             <p>Review the message, then ask the agent to qualify intent and recommend the next move.</p>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo-panel" id="valuation" aria-labelledby="valuation-title" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">04 / Valuation assistant · AVM copilot</p>
+          <h2 id="valuation-title">Evidence assembled. Judgement retained.</h2>
+        </div>
+        <p>Reconcile fictional comparable transactions into an indicative range, transparent adjustments and a report draft ready for a qualified valuer to challenge and approve.</p>
+      </div>
+
+      <div class="workspace advisory-workspace">
+        <aside class="control-panel">
+          <div class="panel-heading">
+            <span class="icon-box" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 20h16M6 17V9h4v8M14 17V4h4v13M3 9l5-4 4 3 7-6"/></svg>
+            </span>
+            <div><p class="eyebrow">Valuation brief</p><h3>Set the subject</h3></div>
+          </div>
+          <form id="valuation-form">
+            <label>Subject property
+              <select id="valuation-property" name="propertyId"></select>
+            </label>
+            <div class="selected-property" id="valuation-subject"></div>
+            <div class="field-grid">
+              <label>Purpose
+                <select name="purpose">
+                  <option>Sale appraisal</option>
+                  <option>Acquisition advice</option>
+                  <option>Refinance review</option>
+                  <option>Portfolio reporting</option>
+                </select>
+              </label>
+              <label>Observed condition
+                <select name="condition">
+                  <option selected>Renovated</option>
+                  <option>Good</option>
+                  <option>Requires work</option>
+                </select>
+              </label>
+            </div>
+            <label>Valuer notes
+              <textarea name="valuerNotes" rows="5" placeholder="Inspection notes, title assumptions or factors to consider…">Assume vacant possession and an arm's-length sale after a standard four-week campaign.</textarea>
+            </label>
+            <div class="example-prompt"><span>Evidence</span> Fictional comparable sales for demonstration only</div>
+            <button class="button button-primary button-wide" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V8h14v12M8 8V4h8v4M8 12h8M8 16h5"/></svg>
+              <span>Draft valuation report</span>
+            </button>
+          </form>
+        </aside>
+        <div class="advisory-output" id="valuation-output">
+          <div class="preview-placeholder">
+            <div class="report-placeholder" aria-hidden="true"><span></span><strong></strong><i></i><i></i><i></i></div>
+            <p class="eyebrow">Valuation draft</p>
+            <h3>Comparable evidence, clearly reconciled.</h3>
+            <p>Select a subject property to produce a transparent value range, adjustments and review assumptions.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo-panel" id="lease" aria-labelledby="lease-title" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">05 / Lease &amp; contract abstraction</p>
+          <h2 id="lease-title">The terms that matter, ready to review.</h2>
+        </div>
+        <p>Turn lengthy commercial agreements into structured terms, obligations, critical dates and visible risks—while preserving a clear route back to professional review.</p>
+      </div>
+
+      <div class="workspace advisory-workspace">
+        <aside class="control-panel">
+          <div class="panel-heading">
+            <span class="icon-box" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6zM14 3v4h4M9 11h6M9 15h6M9 19h4"/></svg>
+            </span>
+            <div><p class="eyebrow">Source document</p><h3>Choose an agreement</h3></div>
+          </div>
+          <form id="lease-form">
+            <label>Lease or contract
+              <select id="lease-document" name="leaseId"></select>
+            </label>
+            <article class="lease-source-card" id="lease-source"></article>
+            <button class="button button-primary button-wide" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.4 4.6L18 9l-4.6 1.4L12 15l-1.4-4.6L6 9l4.6-1.4L12 3ZM6 16h5M6 20h9"/></svg>
+              <span>Abstract key terms</span>
+            </button>
+          </form>
+        </aside>
+        <div class="advisory-output" id="lease-output">
+          <div class="preview-placeholder">
+            <div class="document-placeholder" aria-hidden="true"><span>PDF</span><i></i><i></i><i></i><i></i></div>
+            <p class="eyebrow">Structured abstraction</p>
+            <h3>From document volume to decision clarity.</h3>
+            <p>Choose a sample agreement to extract commercial terms, responsibilities, dates and review flags.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="demo-panel" id="assistant" aria-labelledby="assistant-title" hidden>
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">06 / Tenant virtual assistant</p>
+          <h2 id="assistant-title">Always available. Grounded in the building.</h2>
+        </div>
+        <p>Give occupiers a conversational front door for building questions and maintenance requests, with safe triage, visible sources and a clear hand-off to facilities teams.</p>
+      </div>
+
+      <div class="workspace assistant-workspace">
+        <aside class="assistant-sidebar">
+          <div class="panel-heading">
+            <span class="icon-box" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M5 5h14v11H9l-4 4V5ZM9 10h6M9 13h4"/></svg>
+            </span>
+            <div><p class="eyebrow">Building context</p><h3>Tenant services</h3></div>
+          </div>
+          <label>Managed property
+            <select id="assistant-building"></select>
+          </label>
+          <article class="building-profile" id="assistant-building-profile"></article>
+          <div class="assistant-starters">
+            <p class="eyebrow">Try a request</p>
+            <button type="button" data-assistant-prompt="The air conditioning is too warm on our floor.">Report an HVAC issue</button>
+            <button type="button" data-assistant-prompt="I lost my building access pass. What should I do?">Replace an access pass</button>
+            <button type="button" data-assistant-prompt="There is water leaking near the kitchen power outlet.">Report a water leak</button>
+          </div>
+          <div class="assistant-safety"><strong>Emergency?</strong><span>Call 000 first for fire, gas, serious injury or immediate danger.</span></div>
+        </aside>
+
+        <div class="chat-panel">
+          <header class="chat-header">
+            <div class="assistant-avatar" aria-hidden="true"><span></span></div>
+            <div><strong>Aurelia Tenant Assist</strong><span id="assistant-chat-context">Building support</span></div>
+            <span class="model-chip">GPT-5.4 · grounded</span>
+          </header>
+          <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
+          <form class="chat-composer" id="assistant-form">
+            <label class="sr-only" for="assistant-message">Message tenant assistant</label>
+            <textarea id="assistant-message" name="message" rows="2" placeholder="Ask about the building or describe a maintenance issue…" required></textarea>
+            <button class="button button-primary" type="submit">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 12 16-8-5 16-3-6-8-2Zm8 2 3-3"/></svg>
+              <span>Send</span>
+            </button>
+          </form>
         </div>
       </div>
     </section>

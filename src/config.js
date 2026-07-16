@@ -9,11 +9,16 @@ function normalizeUrl(value, path) {
     throw new Error(`Invalid endpoint URL: ${raw}`);
   }
 
-  if (parsed.protocol !== "https:" && parsed.hostname !== "localhost") {
-    throw new Error("Model endpoints must use HTTPS.");
-  }
+  assertSecureEndpoint(parsed);
 
   return `${parsed.origin}${path}`;
+}
+
+function assertSecureEndpoint(parsed) {
+  const localHosts = new Set(["localhost", "127.0.0.1", "::1"]);
+  if (parsed.protocol !== "https:" && !localHosts.has(parsed.hostname)) {
+    throw new Error("Model endpoints must use HTTPS.");
+  }
 }
 
 export function normalizeAzureOpenAIBaseUrl(value) {
@@ -21,6 +26,7 @@ export function normalizeAzureOpenAIBaseUrl(value) {
   if (!raw) return "";
 
   const parsed = new URL(raw);
+  assertSecureEndpoint(parsed);
   const path = parsed.pathname.replace(/\/+$/, "");
   const v1Index = path.toLowerCase().indexOf("/openai/v1");
   if (v1Index >= 0) {
@@ -34,6 +40,7 @@ export function normalizeMaiEndpoint(value) {
   if (!raw) return "";
 
   const parsed = new URL(raw);
+  assertSecureEndpoint(parsed);
   const routeIndex = parsed.pathname.toLowerCase().indexOf("/mai/v1/");
   const basePath = routeIndex >= 0 ? parsed.pathname.slice(0, routeIndex) : parsed.pathname;
   return `${parsed.origin}${basePath}`.replace(/\/+$/, "");

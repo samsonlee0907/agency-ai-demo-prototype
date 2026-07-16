@@ -1,4 +1,5 @@
 import { readFile, rename, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 
 const MANAGED_KEYS = [
@@ -47,7 +48,7 @@ export async function saveSettings(envPath, values) {
     .trimEnd();
   const managed = MANAGED_KEYS.map((key) => `${key}=${quoteEnv(values[key] || "")}`).join("\n");
   const content = `${preserved ? `${preserved}\n\n` : ""}# Managed by the Aurelia portal\n${managed}\n`;
-  const temporaryPath = path.join(path.dirname(envPath), `.${path.basename(envPath)}.${process.pid}.tmp`);
+  const temporaryPath = path.join(path.dirname(envPath), `.${path.basename(envPath)}.${process.pid}.${randomUUID()}.tmp`);
 
   await writeFile(temporaryPath, content, { encoding: "utf8", mode: 0o600 });
   await rename(temporaryPath, envPath);

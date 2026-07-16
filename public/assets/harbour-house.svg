@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
-  <defs><linearGradient id="s" x2="0" y2="1"><stop stop-color="#9eb9c1"/><stop offset="1" stop-color="#f4d6aa"/></linearGradient><linearGradient id="w"><stop stop-color="#738f99"/><stop offset="1" stop-color="#c8d6d7"/></linearGradient></defs>
-  <rect width="1200" height="800" fill="url(#s)"/><rect y="545" width="1200" height="255" fill="#667862"/><path d="M0 605c250-65 390 85 650 5 210-65 360 15 550-45v235H0Z" fill="#365b64"/>
-  <path d="M235 310 590 160l365 150v315H235Z" fill="#e7dfd0"/><path d="M205 323 590 135l397 188-30 40-367-162-355 162Z" fill="#263b44"/>
-  <rect x="320" y="365" width="190" height="205" fill="url(#w)"/><rect x="665" y="345" width="210" height="225" fill="url(#w)"/><rect x="545" y="414" width="90" height="211" fill="#a77a4f"/>
-  <g fill="#273f37"><circle cx="175" cy="500" r="105"/><circle cx="1030" cy="465" r="130"/><circle cx="105" cy="595" r="80"/></g><g fill="#aeba8b"><circle cx="180" cy="450" r="65"/><circle cx="1035" cy="410" r="85"/></g>
-  <path d="M0 680c330-70 530 60 1200-45v165H0Z" fill="#d4b98e" opacity=".75"/>
-</svg>

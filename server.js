@@ -1,31 +1,47 @@
 import "dotenv/config";
 import express from "express";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { ZodError } from "zod";
 import { getConfig, publicStatus } from "./src/config.js";
-import { findLead, findListing, leads, listings } from "./src/data.js";
-import { generateMarketing, getMockImage, matchProperties, qualifyLead } from "./src/mock-services.js";
+import { buildingProfiles, comparableSales, findBuilding, findLead, findLease, findListing, leads, leaseDocuments, listings } from "./src/data.js";
+import { abstractLease, answerTenant, draftValuation, generateMarketing, getMockImage, matchProperties, qualifyLead } from "./src/mock-services.js";
 import { createGptProvider, ModelResponseError } from "./src/providers/gpt.js";
 import { createMaiImageProvider } from "./src/providers/mai-image.js";
+import { createCampaignEditPrompt } from "./src/property-image-prompts.js";
 import { saveSettings, settingsToEnv } from "./src/settings-store.js";
 import {
+  assistantRequestSchema,
   imageRequestSchema,
+  leaseRequestSchema,
   marketingRequestSchema,
   matchRequestSchema,
   qualificationRequestSchema,
-  settingsRequestSchema
+  settingsRequestSchema,
+  valuationRequestSchema
 } from "./src/schemas.js";
 
 const app = express();
 const root = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(root, ".env");
 const runtime = {};
+let settingsUpdateQueue = Promise.resolve();
 
 function applyConfig(env = process.env) {
   runtime.config = getConfig(env);
   runtime.gpt = createGptProvider(runtime.config.gpt);
   runtime.mai = createMaiImageProvider(runtime.config.mai);
+}
+
+function resolveBuilding(id) {
+  const building = findBuilding(id);
+  if (!building) {
+    const error = new Error("Building not found.");
+    error.status = 404;
+    throw error;
+  }
+  return building;
 }
 
 applyConfig();
@@ -48,7 +64,19 @@ function requireLiveProvider(provider, name) {
 
 function requireLocalRequest(request, _response, next) {
   const address = request.socket.remoteAddress;
-  if (address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1") {
+  const host = String(request.headers.host || "").toLowerCase();
+  const origin = String(request.headers.origin || "");
+  const localAddress = address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+  const localHost = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) || /^\[::1\](?::\d+)?$/.test(host);
+  let localOrigin = true;
+  if (origin) {
+    try {
+      localOrigin = ["localhost", "127.0.0.1", "::1"].includes(new URL(origin).hostname);
+    } catch {
+      localOrigin = false;
+    }
+  }
+  if (localAddress && localHost && localOrigin) {
     next();
     return;
   }
@@ -77,8 +105,31 @@ function resolveLead(id) {
   return lead;
 }
 
+function resolveLease(id) {
+  const lease = findLease(id);
+  if (!lease) {
+    const error = new Error("Lease not found.");
+    error.status = 404;
+    throw error;
+  }
+  return lease;
+}
+
 app.get("/api/status", (_request, response) => {
   response.json(publicStatus(runtime.config));
+});
+
+app.post("/api/assistant", async (request, response, next) => {
+  try {
+    const { mode, buildingId, message, history } = assistantRequestSchema.parse(request.body);
+    const building = resolveBuilding(buildingId);
+    const output = mode === "live"
+      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").respondToTenant(building, message, history)
+      : answerTenant(buildingId, message);
+    response.json({ mode, buildingId, ...output });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/settings", requireLocalRequest, (_request, response) => {
@@ -102,18 +153,29 @@ app.get("/api/settings", requireLocalRequest, (_request, response) => {
 app.put("/api/settings", requireLocalRequest, async (request, response, next) => {
   try {
     const settings = settingsRequestSchema.parse(request.body);
-    const values = settingsToEnv(settings, runtime.config);
-    await saveSettings(envPath, values);
-    Object.assign(process.env, values);
-    applyConfig(process.env);
-    response.json(publicStatus(runtime.config));
+    const update = settingsUpdateQueue.then(async () => {
+      const values = settingsToEnv(settings, runtime.config);
+      const prospectiveEnv = { ...process.env, ...values };
+      try {
+        getConfig(prospectiveEnv);
+      } catch (error) {
+        error.status = 400;
+        throw error;
+      }
+      await saveSettings(envPath, values);
+      Object.assign(process.env, values);
+      applyConfig(process.env);
+      return publicStatus(runtime.config);
+    });
+    settingsUpdateQueue = update.catch(() => {});
+    response.json(await update);
   } catch (error) {
     next(error);
   }
 });
 
 app.get("/api/bootstrap", (_request, response) => {
-  response.json({ listings, leads });
+  response.json({ listings, leads, leaseDocuments, buildingProfiles });
 });
 
 app.post("/api/match", async (request, response, next) => {
@@ -156,12 +218,44 @@ app.post("/api/qualify", async (request, response, next) => {
 
 app.post("/api/image", async (request, response, next) => {
   try {
-    const { mode, propertyId, prompt, width, height } = imageRequestSchema.parse(request.body);
-    resolveListing(propertyId);
+    const { mode, propertyId, prompt } = imageRequestSchema.parse(request.body);
+    const property = resolveListing(propertyId);
+    const sourcePath = path.join(root, "public", property.image.replace(/^\//, ""));
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.mai, "MAI-Image-2.5").generate({ prompt, width, height })
+      ? await requireLiveProvider(runtime.mai, "MAI-Image-2.5").edit({
+          prompt: createCampaignEditPrompt(prompt),
+          image: await readFile(sourcePath),
+          filename: path.basename(sourcePath),
+          mimeType: path.extname(sourcePath).toLowerCase() === ".jpg" ? "image/jpeg" : "image/png"
+        })
       : getMockImage(propertyId, prompt);
     response.json({ mode, propertyId, ...output });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/valuation", async (request, response, next) => {
+  try {
+    const { mode, propertyId, settings } = valuationRequestSchema.parse(request.body);
+    const property = resolveListing(propertyId);
+    const output = mode === "live"
+      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").draftValuation(property, settings, comparableSales)
+      : draftValuation(propertyId, settings);
+    response.json({ mode, propertyId, ...output });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/lease", async (request, response, next) => {
+  try {
+    const { mode, leaseId } = leaseRequestSchema.parse(request.body);
+    const lease = resolveLease(leaseId);
+    const output = mode === "live"
+      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").abstractLease(lease)
+      : abstractLease(leaseId);
+    response.json({ mode, leaseId, ...output });
   } catch (error) {
     next(error);
   }
@@ -186,7 +280,7 @@ app.use((error, _request, response, _next) => {
 });
 
 export function startServer(port = runtime.config.port) {
-  return app.listen(port, () => {
+  return app.listen(port, "127.0.0.1", () => {
     console.log(`Aurelia Agency AI is running at http://localhost:${port}`);
     console.log(`Mode: ${runtime.config.defaultMode} | GPT: ${runtime.config.gpt.configured ? "configured" : "not configured"} | MAI: ${runtime.config.mai.configured ? "configured" : "not configured"}`);
   });

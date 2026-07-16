@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800">
-  <defs><linearGradient id="a" x2="1" y2="1"><stop stop-color="#e7c99b"/><stop offset="1" stop-color="#7d563c"/></linearGradient></defs>
-  <rect width="1200" height="800" fill="#b9a892"/><rect y="0" width="1200" height="170" fill="#b7c2c0"/><path d="M0 660 1200 525v275H0Z" fill="#7c6652"/>
-  <path d="M145 145h910v510H145Z" fill="#8e5b3e"/><path d="M105 145h990L970 70H225Z" fill="#34393a"/><g fill="#262f30"><rect x="205" y="225" width="210" height="330"/><rect x="495" y="225" width="210" height="330"/><rect x="785" y="225" width="210" height="330"/></g>
-  <g fill="url(#a)"><rect x="228" y="248" width="164" height="284"/><rect x="518" y="248" width="164" height="284"/><rect x="808" y="248" width="164" height="284"/></g>
-  <g stroke="#292f2f" stroke-width="15"><path d="M310 248v284M600 248v284M890 248v284"/><path d="M228 390h164M518 390h164M808 390h164"/></g>
-  <path d="M0 700c240-70 500-40 1200-125v225H0Z" fill="#cfbd9f"/><g fill="#40554a"><circle cx="110" cy="605" r="70"/><circle cx="1080" cy="560" r="95"/></g>
-</svg>

@@ -3,6 +3,10 @@ const state = {
   status: null,
   listings: [],
   leads: [],
+  leases: [],
+  buildings: [],
+  assistantHistory: [],
+  assistantPending: false,
   selectedLeadId: null,
   marketing: null
 };
@@ -181,7 +185,7 @@ async function saveSettings(event) {
   }
 }
 
-function activateDemo(id) {
+function activateDemo(id, updateLocation = true) {
   $$(".demo-tab").forEach((button) => {
     const active = button.dataset.demo === id;
     button.classList.toggle("is-active", active);
@@ -192,7 +196,11 @@ function activateDemo(id) {
     panel.classList.toggle("is-active", active);
     panel.hidden = !active;
   });
-  document.querySelector(`#${id}`).scrollIntoView({ behavior: "smooth", block: "start" });
+  if (updateLocation && window.location.hash !== `#${id}`) {
+    history.replaceState(null, "", `#${id}`);
+  }
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  document.querySelector(`#${id}`).scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
 }
 
 function renderPropertySelect() {
@@ -210,6 +218,107 @@ function renderSelectedProperty() {
     <img src="${escapeHtml(property.image)}" alt="">
     <span><strong>${escapeHtml(property.name)}</strong><span>${money.format(property.price)} · ${property.beds} bed · ${property.baths} bath</span></span>
   `;
+}
+
+function renderValuationPropertySelect() {
+  const select = $("#valuation-property");
+  select.innerHTML = state.listings
+    .map((listing) => `<option value="${escapeHtml(listing.id)}">${escapeHtml(listing.name)} · ${escapeHtml(listing.area)}</option>`)
+    .join("");
+  renderValuationSubject();
+}
+
+function renderValuationSubject() {
+  const property = listingById($("#valuation-property").value);
+  if (!property) return;
+  $("#valuation-subject").innerHTML = `
+    <img src="${escapeHtml(property.image)}" alt="">
+    <span><strong>${escapeHtml(property.name)}</strong><span>${money.format(property.price)} guide · ${property.beds} bed · ${escapeHtml(property.type)}</span></span>
+  `;
+}
+
+function leaseById(id) {
+  return state.leases.find((lease) => lease.id === id);
+}
+
+function renderLeaseSelect() {
+  $("#lease-document").innerHTML = state.leases
+    .map((lease) => `<option value="${escapeHtml(lease.id)}">${escapeHtml(lease.title)}</option>`)
+    .join("");
+  renderLeaseSource();
+}
+
+function renderLeaseSource() {
+  const lease = leaseById($("#lease-document").value);
+  if (!lease) return;
+  const excerpt = lease.content.length > 520 ? `${lease.content.slice(0, 520)}…` : lease.content;
+  $("#lease-source").innerHTML = `
+    <div class="lease-file-head">
+      <span class="file-badge">PDF</span>
+      <div><strong>${escapeHtml(lease.fileName)}</strong><small>${lease.pageCount} pages · ${escapeHtml(lease.updated)}</small></div>
+    </div>
+    <p>${escapeHtml(lease.source)}</p>
+    <pre>${escapeHtml(excerpt)}</pre>
+  `;
+}
+
+function buildingById(id) {
+  return state.buildings.find((building) => building.id === id);
+}
+
+function renderAssistantBuilding() {
+  const building = buildingById($("#assistant-building").value);
+  if (!building) return;
+  $("#assistant-building-profile").innerHTML = `
+    <p class="eyebrow">${escapeHtml(building.type)}</p>
+    <h4>${escapeHtml(building.name)}</h4>
+    <p>${escapeHtml(building.address)}</p>
+    <dl><div><dt>Service desk</dt><dd>${escapeHtml(building.serviceHours)}</dd></div><div><dt>Urgent support</dt><dd>${escapeHtml(building.emergencyContact)}</dd></div></dl>
+  `;
+  $("#assistant-chat-context").textContent = `${building.name} · 24/7 support`;
+  state.assistantHistory = [{
+    role: "assistant",
+    content: `Welcome to ${building.name}. I can answer building questions, explain tenant services and help log a maintenance request. How can I help?`
+  }];
+  renderAssistantMessages();
+}
+
+function renderAssistantBuildingSelect() {
+  $("#assistant-building").innerHTML = state.buildings
+    .map((building) => `<option value="${escapeHtml(building.id)}">${escapeHtml(building.name)} · ${escapeHtml(building.type)}</option>`)
+    .join("");
+  renderAssistantBuilding();
+}
+
+function renderAssistantMessages() {
+  const container = $("#chat-messages");
+  container.innerHTML = state.assistantHistory.map((message) => {
+    const response = message.response;
+    return `
+      <article class="chat-message ${message.role === "user" ? "is-user" : "is-assistant"}">
+        <span class="chat-speaker">${message.role === "user" ? "You" : "Aurelia"}</span>
+        <div class="message-bubble"><p>${escapeHtml(message.content)}</p></div>
+        ${response ? `
+          <div class="assistant-result">
+            <div class="triage-row">
+              <span class="triage-badge urgency-${response.urgency.toLowerCase()}">${escapeHtml(response.urgency)}</span>
+              <span>${escapeHtml(response.category)}</span>
+            </div>
+            ${response.workOrder.created ? `
+              <div class="work-order-card">
+                <span>Work order created</span><strong>${escapeHtml(response.workOrder.reference)}</strong>
+                <p>${escapeHtml(response.workOrder.summary)}</p><small>${escapeHtml(response.workOrder.nextUpdate)}</small>
+              </div>
+            ` : ""}
+            <p class="assistant-action"><strong>Next step</strong>${escapeHtml(response.recommendedAction)}</p>
+            <div class="assistant-citations"><span>Sources</span>${response.citations.map((citation) => `<i>${escapeHtml(citation)}</i>`).join("")}</div>
+            <div class="assistant-followups">${response.suggestions.map((suggestion) => `<button type="button" data-assistant-prompt="${escapeHtml(suggestion)}"${state.assistantPending ? " disabled" : ""}>${escapeHtml(suggestion)}</button>`).join("")}</div>
+          </div>
+        ` : ""}
+      </article>
+    `;
+  }).join("");
+  container.scrollTop = container.scrollHeight;
 }
 
 function renderLeadList() {
@@ -279,7 +388,7 @@ async function submitMatch(event) {
           return `
             <article class="property-card">
               <div class="property-card-image">
-                <img src="${escapeHtml(property.image)}" alt="Illustrated view of ${escapeHtml(property.name)}">
+                <img src="${escapeHtml(property.image)}" alt="Exterior or interior photograph of ${escapeHtml(property.name)}">
                 <span class="match-score"><strong>${match.score}</strong><small>% fit</small></span>
               </div>
               <div class="property-card-body">
@@ -335,7 +444,10 @@ function renderCampaign(imageResult = null) {
   const campaign = state.marketing;
   const property = listingById(campaign.propertyId);
   const imageUrl = imageResult?.imageUrl || property.image;
-  const modelLabel = imageResult?.model || (state.mode === "live" ? "Property image · MAI ready" : "Bundled property artwork");
+  const modelLabel = imageResult?.model
+    ? `Campaign edit · ${imageResult.model}`
+    : "Authentic base photograph · generated with MAI-Image-2.5";
+  const actionLabel = imageResult ? "Regenerate campaign edit" : "Brush up base image";
 
   $("#marketing-output").innerHTML = `
     <article class="campaign">
@@ -364,10 +476,13 @@ function renderCampaign(imageResult = null) {
         </div>
       </div>
       <div class="image-actions">
-        <p>${escapeHtml(modelLabel)}</p>
-        <button class="button button-gold" type="button" id="generate-image-button" data-action-label="${imageResult ? "Regenerate hero image" : "Generate hero image"}">
+        <div class="image-source">
+          <img src="${escapeHtml(property.image)}" alt="">
+          <span><strong>Source photograph</strong>${escapeHtml(modelLabel)}</span>
+        </div>
+        <button class="button button-gold" type="button" id="generate-image-button" data-action-label="${actionLabel}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 16l5-5 4 4 2-2 5 5M16 9h.01"/></svg>
-          <span>${imageResult ? "Regenerate hero image" : "Generate hero image"}</span>
+          <span>${actionLabel}</span>
         </button>
       </div>
     </article>
@@ -388,23 +503,189 @@ function updateImageButton() {
 
 async function generateImage() {
   const button = $("#generate-image-button");
-  setButtonLoading(button, true, "Generating with MAI…");
+  const campaign = state.marketing;
+  setButtonLoading(button, true, "Brushing up with MAI…");
   try {
     const result = await api("/api/image", {
       method: "POST",
       body: JSON.stringify({
         mode: state.mode,
-        propertyId: state.marketing.propertyId,
-        prompt: state.marketing.imagePrompt,
-        width: 1024,
-        height: 1024
+        propertyId: campaign.propertyId,
+        prompt: campaign.imagePrompt
       })
     });
+    if (state.marketing !== campaign) return;
     renderCampaign(result);
-    showToast(result.generated ? "Hero image generated." : "Mock creative preview applied.");
+    showToast(result.generated ? "Base photograph polished for the campaign." : "Mock enhancement preview applied.");
   } catch (error) {
     showToast(error.message);
     setButtonLoading(button, false);
+  }
+}
+
+async function submitValuation(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('button[type="submit"]', form);
+    const data = Object.fromEntries(new FormData(form));
+    const output = $("#valuation-output");
+    setButtonLoading(button, true, "Reconciling evidence…");
+    output.innerHTML = loadingMarkup("Adjusting comparable sales and drafting the valuer review…");
+
+    try {
+      const result = await api("/api/valuation", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: state.mode,
+          propertyId: data.propertyId,
+          settings: { purpose: data.purpose, condition: data.condition, valuerNotes: data.valuerNotes }
+        })
+      });
+      renderValuation(result);
+    } catch (error) {
+      output.innerHTML = errorMarkup(error);
+    } finally {
+      setButtonLoading(button, false);
+    }
+}
+
+function renderValuation(result) {
+    const property = listingById(result.propertyId);
+    $("#valuation-output").innerHTML = `
+      <article class="valuation-report">
+        <header class="valuation-report-head">
+          <div><p class="eyebrow">Indicative valuation · ${escapeHtml(result.effectiveDate)}</p><h3>${escapeHtml(property.name)}</h3><p>${escapeHtml(property.location)}</p></div>
+          <span class="model-chip">${escapeHtml(result.confidence)} confidence</span>
+        </header>
+        <div class="value-conclusion">
+          <div><span>Adopted midpoint</span><strong>${money.format(result.valueMid)}</strong></div>
+          <div><span>Indicative range</span><strong>${money.format(result.valueLow)} — ${money.format(result.valueHigh)}</strong></div>
+        </div>
+        <p class="valuation-summary">${escapeHtml(result.summary)}</p>
+        <section class="report-section">
+          <div class="report-section-head"><div><p class="eyebrow">Comparable evidence</p><h4>Adjusted transactions</h4></div><span>${result.comparables.length} sales reconciled</span></div>
+          <div class="comparable-table" role="table" aria-label="Comparable sales">
+            <div class="comparable-row comparable-header" role="row"><span>Transaction</span><span>Sale price</span><span>Adjusted</span><span>Weight</span></div>
+            ${result.comparables.map((comparable) => `
+              <div class="comparable-row" role="row">
+                <span><strong>${escapeHtml(comparable.address)}</strong><small>${escapeHtml(comparable.saleDate)} · ${escapeHtml(comparable.rationale)}</small><i>${comparable.adjustments.map(escapeHtml).join(" · ")}</i></span>
+                <span>${money.format(comparable.salePrice)}</span>
+                <span>${money.format(comparable.adjustedValue)}</span>
+                <span><b>${comparable.weight}%</b></span>
+              </div>
+            `).join("")}
+          </div>
+        </section>
+        <div class="report-columns">
+          <section class="report-card"><p class="eyebrow">Market view</p><h4>Reconciliation</h4><p>${escapeHtml(result.marketCommentary)}</p></section>
+          <section class="report-card"><p class="eyebrow">Review controls</p><h4>Assumptions</h4><ul>${result.assumptions.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+        </div>
+        <section class="report-card risk-card"><p class="eyebrow">Sensitivity</p><h4>Risks to the opinion</h4><ul>${result.risks.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+        <footer class="report-signoff"><strong>Valuer sign-off required</strong><span>${escapeHtml(result.signOff)}</span></footer>
+      </article>
+    `;
+}
+
+async function submitLease(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('button[type="submit"]', form);
+    const { leaseId } = Object.fromEntries(new FormData(form));
+    const output = $("#lease-output");
+    setButtonLoading(button, true, "Reading the agreement…");
+    output.innerHTML = loadingMarkup("Extracting terms, obligations and review flags…");
+
+    try {
+      const result = await api("/api/lease", {
+        method: "POST",
+        body: JSON.stringify({ mode: state.mode, leaseId })
+      });
+      renderLeaseAbstraction(result);
+    } catch (error) {
+      output.innerHTML = errorMarkup(error);
+    } finally {
+      setButtonLoading(button, false);
+    }
+}
+
+function renderLeaseAbstraction(result) {
+    const terms = [
+      ["Premises", result.premises],
+      ["Initial term", `${result.term.initialTerm} · ${result.term.commencement} to ${result.term.expiry}`],
+      ["Options", result.term.options],
+      ["Base rent", `${result.rent.baseAnnual} · ${result.rent.payment}`],
+      ["Rent review", result.rent.review],
+      ["Incentive", result.incentive],
+      ["Security", result.security],
+      ["Outgoings", result.outgoings],
+      ["Permitted use", result.permittedUse],
+      ["Break rights", result.breakClause]
+    ];
+    $("#lease-output").innerHTML = `
+      <article class="lease-abstraction">
+        <header class="lease-report-head">
+          <div><p class="eyebrow">Structured lease abstraction</p><h3>${escapeHtml(result.documentTitle)}</h3></div>
+          <button class="button button-secondary" id="copy-lease-summary" type="button">Copy summary</button>
+        </header>
+        <div class="party-strip">
+          <div><span>Landlord</span><strong>${escapeHtml(result.parties.landlord)}</strong></div>
+          <div><span>Tenant</span><strong>${escapeHtml(result.parties.tenant)}</strong></div>
+        </div>
+        <p class="lease-summary">${escapeHtml(result.executiveSummary)}</p>
+        <section class="report-section"><p class="eyebrow">Key commercial terms</p><div class="terms-grid">${terms.map(([label, value]) => `<div class="term-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join("")}</div></section>
+        <div class="report-columns">
+          <section class="report-card"><p class="eyebrow">Tenant</p><h4>Key obligations</h4><ul>${result.tenantObligations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+          <section class="report-card"><p class="eyebrow">Landlord</p><h4>Key obligations</h4><ul>${result.landlordObligations.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></section>
+        </div>
+        <section class="report-section"><div class="report-section-head"><div><p class="eyebrow">Diary</p><h4>Critical dates</h4></div></div><div class="critical-dates">${result.criticalDates.map((item) => `<div><time>${escapeHtml(item.date)}</time><span><strong>${escapeHtml(item.event)}</strong><small>${escapeHtml(item.owner)} owner</small></span></div>`).join("")}</div></section>
+        <section class="report-section"><div class="report-section-head"><div><p class="eyebrow">Review queue</p><h4>Risks &amp; exceptions</h4></div><span>${result.risks.length} flags</span></div><div class="lease-risks">${result.risks.map((risk) => `<article class="lease-risk severity-${risk.severity.toLowerCase()}"><span>${escapeHtml(risk.severity)}</span><div><strong>${escapeHtml(risk.title)}</strong><p>${escapeHtml(risk.detail)}</p><small>${escapeHtml(risk.clause)}</small></div></article>`).join("")}</div></section>
+        <footer class="report-signoff"><strong>Professional review required</strong><span>${escapeHtml(result.reviewNote)}</span></footer>
+      </article>
+    `;
+    $("#copy-lease-summary").addEventListener("click", () => copyText(result.executiveSummary));
+}
+
+async function submitAssistantMessage(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const textarea = $("#assistant-message");
+  const button = $('button[type="submit"]', form);
+  const message = textarea.value.trim();
+  if (!message || state.assistantPending) return;
+  const buildingId = $("#assistant-building").value;
+  const history = state.assistantHistory
+    .slice(-10)
+    .map((entry) => ({ role: entry.role, content: entry.content }));
+  state.assistantPending = true;
+  state.assistantHistory.push({ role: "user", content: message });
+  textarea.value = "";
+  textarea.disabled = true;
+  $("#assistant-building").disabled = true;
+  renderAssistantMessages();
+  setButtonLoading(button, true, "Thinking…");
+
+  try {
+    const result = await api("/api/assistant", {
+      method: "POST",
+      body: JSON.stringify({
+        mode: state.mode,
+        buildingId,
+        message,
+        history
+      })
+    });
+    if ($("#assistant-building").value !== buildingId) return;
+    state.assistantHistory.push({ role: "assistant", content: result.reply, response: result });
+  } catch (error) {
+    if ($("#assistant-building").value !== buildingId) return;
+    state.assistantHistory.push({ role: "assistant", content: `I couldn't complete that request: ${error.message}` });
+  } finally {
+    state.assistantPending = false;
+    textarea.disabled = false;
+    $("#assistant-building").disabled = false;
+    setButtonLoading(button, false);
+    renderAssistantMessages();
+    textarea.focus();
   }
 }
 
@@ -421,6 +702,7 @@ async function qualifySelectedLead() {
       method: "POST",
       body: JSON.stringify({ mode: state.mode, leadId: lead.id })
     });
+    if (state.selectedLeadId !== lead.id) return;
     detail.innerHTML = `
       <div class="lead-header">
         <div class="lead-person">
@@ -458,6 +740,7 @@ async function qualifySelectedLead() {
     `;
     $("#copy-follow-up").addEventListener("click", () => copyText($("#follow-up-text").value));
   } catch (error) {
+    if (state.selectedLeadId !== lead.id) return;
     detail.innerHTML = `${header}${enquiry}${errorMarkup(error)}`;
   }
 }
@@ -477,6 +760,18 @@ function wireEvents() {
   $("#match-form").addEventListener("submit", submitMatch);
   $("#marketing-form").addEventListener("submit", submitMarketing);
   $("#marketing-property").addEventListener("change", renderSelectedProperty);
+  $("#valuation-form").addEventListener("submit", submitValuation);
+  $("#valuation-property").addEventListener("change", renderValuationSubject);
+  $("#lease-form").addEventListener("submit", submitLease);
+  $("#lease-document").addEventListener("change", renderLeaseSource);
+  $("#assistant-form").addEventListener("submit", submitAssistantMessage);
+  $("#assistant-building").addEventListener("change", renderAssistantBuilding);
+  $(".assistant-workspace").addEventListener("click", (event) => {
+    const prompt = event.target.closest("[data-assistant-prompt]")?.dataset.assistantPrompt;
+    if (!prompt || state.assistantPending) return;
+    $("#assistant-message").value = prompt;
+    $("#assistant-form").requestSubmit();
+  });
   $("#lead-list").addEventListener("click", (event) => {
     const button = event.target.closest("[data-lead-id]");
     if (button) selectLead(button.dataset.leadId);
@@ -498,6 +793,10 @@ function wireEvents() {
       $("#status-button").setAttribute("aria-expanded", "false");
     }
   });
+  window.addEventListener("hashchange", () => {
+    const id = window.location.hash.slice(1);
+    if ($(`.demo-tab[data-demo="${id}"]`)) activateDemo(id, false);
+  });
 }
 
 async function initialize() {
@@ -507,10 +806,17 @@ async function initialize() {
     state.status = status;
     state.listings = bootstrap.listings;
     state.leads = bootstrap.leads;
+    state.leases = bootstrap.leaseDocuments;
+    state.buildings = bootstrap.buildingProfiles;
     renderStatus();
     renderPropertySelect();
     renderLeadList();
+    renderValuationPropertySelect();
+    renderLeaseSelect();
+    renderAssistantBuildingSelect();
     selectLead(state.leads[0].id);
+    const requestedDemo = window.location.hash.slice(1);
+    if ($(`.demo-tab[data-demo="${requestedDemo}"]`)) activateDemo(requestedDemo, false);
   } catch (error) {
     $("#status-label").textContent = "Server unavailable";
     showToast(error.message);

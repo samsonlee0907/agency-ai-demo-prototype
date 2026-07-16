@@ -1,10 +1,13 @@
 # Aurelia Agency AI Studio
 
-A lightweight, client-facing web app demonstrating three Microsoft Foundry use cases for property agencies and brokerages:
+A lightweight, client-facing web app demonstrating six Microsoft Foundry use cases for property agencies and brokerages:
 
 1. **Intelligent property matching** — turns a structured buyer brief into an explainable ranked shortlist.
-2. **Marketing content studio** — creates coordinated property copy and an MAI image direction.
+2. **Marketing content studio** — creates coordinated property copy and uses MAI image editing to polish the selected authentic base photograph.
 3. **Lead qualification agent** — extracts intent, prioritises the enquiry and drafts a personal follow-up.
+4. **Valuation assistant (AVM copilot)** — reconciles fictional comparable transactions into an indicative range and valuer-review draft.
+5. **Lease and contract abstraction** — extracts commercial terms, obligations, critical dates and review flags from sample agreements.
+6. **Tenant virtual assistant** — answers grounded building questions, triages maintenance and creates transparent work-order hand-offs in a conversational interface.
 
 The app works immediately with deterministic mock data. Live mode uses GPT-5.4 and MAI-Image-2.5 through server-side providers, so browser code never receives model credentials.
 
@@ -25,6 +28,7 @@ Useful scripts:
 npm run dev    # restart on source changes
 npm test       # focused Node test suite
 npm run lint   # syntax-check project JavaScript
+npm run generate:property-images # regenerate authentic listing photography with MAI
 ```
 
 ## Configure live models
@@ -62,7 +66,7 @@ client.responses.create({ model: deployment, input: /* ... */ })
 
 Each workflow requests a strict JSON schema and validates the parsed result with Zod before returning it to the browser.
 
-For resources with key authentication disabled, choose **Microsoft Entra ID** for both providers in the portal. The app uses `DefaultAzureCredential` and the official `https://ai.azure.com/.default` scope. Locally this can use your `az login` session; in Azure it can use managed identity. Assign the active identity the **Foundry User** role on the Foundry resource.
+For resources with key authentication disabled, choose **Microsoft Entra ID** for both providers in the portal. The app uses `DefaultAzureCredential`: GPT requests use `https://ai.azure.com/.default`, while MAI follows the current Microsoft guidance with `https://cognitiveservices.azure.com/.default`. Locally this can use your `az login` session; in Azure it can use managed identity. Assign the active identity the **Foundry User** role on the Foundry resource.
 
 MAI routing is isolated in `src/providers/mai-image.js`, following the route used by the referenced Microsoft model portal:
 
@@ -74,6 +78,17 @@ api-key: <server-side key>
 
 The provider extracts `data[0].b64_json`. If a resource uses a different route, only that provider module needs adjustment.
 
+The six catalogue photographs in `public/assets/properties/` are generated from restrained, property-specific prompts by `scripts/generate-property-images.mjs`. Campaign imagery uses the official MAI image-to-image edit API with the selected photograph sent as server-side multipart form data:
+
+```text
+POST {MAI_ENDPOINT}/mai/v1/images/edits
+model=<deployment>
+prompt=<restrained campaign edit direction>
+image=@<bundled property photograph>
+```
+
+The edit prompt explicitly preserves the property's architecture, materials, landscaping and camera position. See Microsoft's [MAI image generation and editing guidance](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/how-to/use-foundry-models-mai-image).
+
 ## Architecture
 
 ```text
@@ -81,11 +96,15 @@ public/                       responsive vanilla HTML/CSS/JS client
 server.js                     Express static host and secure API proxy
 src/config.js                 endpoint normalization and public readiness state
 src/data.js                   realistic listings and inbound enquiries
-src/mock-services.js          deterministic matching/content/qualification
+src/mock-services.js          deterministic workflows for all five scenarios
 src/providers/gpt.js          GPT Responses API + strict output validation
-src/providers/mai-image.js    MAI generation route and response extraction
+src/providers/mai-image.js    MAI generation/edit routes and response parsing
+src/property-image-prompts.js restrained base-generation and edit directions
 src/schemas.js                request and model-output contracts
+scripts/                      syntax checks and reproducible property imagery
 test/                         focused unit and API smoke tests
 ```
 
 `GET /api/status` reports only model readiness and deployment names—never endpoints or secrets. Live provider failures return explicit API errors and are never replaced with mock success.
+
+`POST /api/valuation`, `POST /api/lease` and `POST /api/assistant` use the same server-side GPT-5.4 Responses provider and strict schema validation as the original scenarios. Comparable sales, lease documents, parties, buildings and work orders are fictional demo data. Valuation output requires qualified-valuer sign-off; lease output requires professional legal review; the tenant assistant directs immediate danger to emergency services rather than relying on automated triage.

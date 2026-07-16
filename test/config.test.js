@@ -33,6 +33,17 @@ test("normalizes MAI endpoint when a full generation route is supplied", () => {
   );
 });
 
+test("rejects plaintext full provider routes", () => {
+  assert.throws(
+    () => normalizeAzureOpenAIBaseUrl("http://example.com/openai/v1/responses"),
+    /must use HTTPS/
+  );
+  assert.throws(
+    () => normalizeMaiEndpoint("http://example.com/mai/v1/images/edits"),
+    /must use HTTPS/
+  );
+});
+
 test("live mode falls back explicitly when GPT credentials are incomplete", () => {
   const config = getConfig({
     MODEL_MODE: "live",

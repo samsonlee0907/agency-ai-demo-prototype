@@ -1,12 +1,18 @@
 import OpenAI from "openai";
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 import {
+  assistantJsonSchema,
+  assistantOutputSchema,
   matchJsonSchema,
   matchOutputSchema,
   marketingJsonSchema,
   marketingOutputSchema,
+  leaseJsonSchema,
+  leaseOutputSchema,
   qualificationJsonSchema,
-  qualificationOutputSchema
+  qualificationOutputSchema,
+  valuationJsonSchema,
+  valuationOutputSchema
 } from "../schemas.js";
 
 export class ModelResponseError extends Error {
@@ -33,6 +39,26 @@ function parseJsonOutput(text, schema) {
     throw new ModelResponseError(`GPT response failed validation: ${validated.error.issues[0]?.message || "invalid shape"}`);
   }
   return validated.data;
+}
+
+export function groundValuationComparables(result, comparables) {
+  const sources = new Map(comparables.map((comparable) => [comparable.id, comparable]));
+  const ids = result.comparables.map((comparable) => comparable.id);
+  if (ids.some((id) => !sources.has(id)) || new Set(ids).size !== ids.length) {
+    throw new ModelResponseError("GPT returned an unknown or duplicate comparable identifier.");
+  }
+  return {
+    ...result,
+    comparables: result.comparables.map((comparable) => {
+      const source = sources.get(comparable.id);
+      return {
+        ...comparable,
+        address: `${source.address}, ${source.area}`,
+        saleDate: source.saleDate,
+        salePrice: source.salePrice
+      };
+    })
+  };
 }
 
 export function createGptProvider(config) {
@@ -105,7 +131,7 @@ export function createGptProvider(config) {
     generateMarketing(property, settings) {
       return generateStructured({
         name: "property_campaign",
-        instructions: "You are an award-winning real estate creative director. Create polished, accurate campaign content grounded only in the property facts. Avoid clichés, unsupported superlatives and fair-housing-sensitive audience assumptions.",
+        instructions: "You are an award-winning real estate creative director. Create polished, accurate campaign content grounded only in the property facts. Avoid clichés, unsupported superlatives and fair-housing-sensitive audience assumptions. The imagePrompt is an editing direction for the property's supplied base photograph: preserve the exact architecture and camera composition, use restrained exposure, natural-light and colour improvements, and never add property features.",
         input: { property, settings },
         jsonSchema: marketingJsonSchema,
         outputSchema: marketingOutputSchema
@@ -119,6 +145,38 @@ export function createGptProvider(config) {
         jsonSchema: qualificationJsonSchema,
         outputSchema: qualificationOutputSchema
       });
+    },
+    async draftValuation(property, settings, comparables) {
+      const result = await generateStructured({
+        name: "valuation_draft",
+        instructions: "You are an experienced Australian property valuation copilot. Draft an evidence-led indicative valuation for qualified-valuer review. Use only the supplied fictional comparable IDs and facts. Explain adjustments candidly, keep the range ordered and never represent the output as a certified valuation.",
+        input: { property, settings, comparables, effectiveDate: "16 July 2026" },
+        jsonSchema: valuationJsonSchema,
+        outputSchema: valuationOutputSchema
+      });
+      return groundValuationComparables(result, comparables);
+    },
+    abstractLease(lease) {
+      return generateStructured({
+        name: "lease_abstraction",
+        instructions: "You are a careful commercial lease abstraction assistant. Extract only terms supported by the supplied document text. Preserve uncertainty and conflicts, identify material deadlines and obligations, and flag the output for professional legal review. Do not infer missing clauses.",
+        input: { lease },
+        jsonSchema: leaseJsonSchema,
+        outputSchema: leaseOutputSchema
+      });
+    },
+    async respondToTenant(building, message, history) {
+      const result = await generateStructured({
+        name: "tenant_assistant_response",
+        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely, never invent access, lease or account facts, and direct emergencies to local emergency services before building security. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details.",
+        input: { building, message, history },
+        jsonSchema: assistantJsonSchema,
+        outputSchema: assistantOutputSchema
+      });
+      if (result.urgency === "Emergency" && !/\b000\b/.test(result.reply)) {
+        throw new ModelResponseError("GPT emergency guidance did not direct the tenant to emergency services.");
+      }
+      return result;
     }
   };
 }
