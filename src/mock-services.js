@@ -150,7 +150,7 @@ export function generateMarketing(propertyId, settings) {
     socialCopy: `${direction.headline}. ${direction.strapline} Explore ${property.name}: ${property.beds} bedrooms, ${property.baths} bathrooms, ${featureLead}, and a guide of ${formatMoney(property.price)}. Contact the Aurelia team to arrange a considered inspection.${instagram ? ` #SydneyProperty #${property.area.replace(/\s/g, "")}` : ""}`,
     highlights: property.features.slice(0, 4),
     callToAction: `Arrange a private inspection of ${property.name} with the Aurelia ${property.area} team.`,
-    imagePrompt: `Polish the supplied base photograph of ${property.name} in ${property.area} for a ${settings.channel.toLowerCase()} campaign aimed at ${audience}. Preserve the exact property and camera composition. Gently emphasise ${property.features.slice(0, 3).join(", ").toLowerCase()} through natural light, balanced exposure and restrained editorial colour. Keep materials and architecture authentic; no added features, people or text.`
+    imagePrompt: `Create a clearly visible before-and-after transformation of the supplied base photograph of ${property.name} in ${property.area} for ${settings.channel.toLowerCase()}, aimed at ${audience}. Shift the scene to warm late-afternoon light, brighten the principal surfaces and landscaping or interior, add plausible warm practical lighting where visible, deepen the sky or outlook, and apply richer editorial colour and contrast. Make ${property.features.slice(0, 3).join(", ").toLowerCase()} read more clearly while preserving the exact property, materials and camera composition. Do not invent permanent property features.`
   };
 }
 

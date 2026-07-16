@@ -9,5 +9,7 @@ test("campaign edits allow explicitly requested temporary elements", () => {
   assert.match(prompt, /people, furniture, vehicles, plants or decorations/);
   assert.match(prompt, new RegExp(direction));
   assert.doesNotMatch(prompt, /no people/i);
+  assert.match(prompt, /campaign text, signage, a graphic overlay, logo or wordmark/);
+  assert.match(prompt, /Do not add unrequested text, logos/);
   assert.match(prompt, /Do not add rooms, pools, views, structures/);
 });

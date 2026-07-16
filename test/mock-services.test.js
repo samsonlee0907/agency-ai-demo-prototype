@@ -34,7 +34,9 @@ test("marketing mock uses selected property and campaign settings", () => {
   assert.match(campaign.description, /warehouse past/i);
   assert.match(campaign.callToAction, /private inspection/i);
   assert.match(campaign.imagePrompt, /Surry Hills/);
-  assert.match(campaign.imagePrompt, /Preserve the exact property/);
+  assert.match(campaign.imagePrompt, /preserving the exact property/i);
+  assert.match(campaign.imagePrompt, /clearly visible before-and-after transformation/i);
+  assert.match(campaign.imagePrompt, /warm late-afternoon light/i);
   assert.equal(campaign.highlights.length, 4);
 });
 

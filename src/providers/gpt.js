@@ -212,7 +212,7 @@ export function createGptProvider(config) {
           "highlights must be concise, benefit-led and factually traceable. callToAction must be specific to an inspection or agent conversation rather than generic marketing language.",
           "Avoid stock phrases and empty luxury language, including 'rare opportunity', 'prestigious', 'exceptional', 'elevated living', 'effortless', 'sanctuary', 'masterpiece', 'discover', and 'where X meets Y'.",
           "Treat audience as campaign context only; never infer protected characteristics or make exclusionary claims.",
-          "The imagePrompt is an editing direction for the supplied base photograph. Preserve the exact building, materials, landscaping and camera composition; specify believable light, exposure and tonal treatment suited to the campaign idea, and never add or remove property features.",
+          "The imagePrompt is an editing direction for the supplied base photograph. Make the before-and-after transformation immediately visible: choose a noticeable but believable shift in time of day, natural light, practical lighting, presentation and editorial colour, using precise imperative language rather than words such as 'gently enhance'. Preserve the exact building, materials, landscaping and camera composition; never add or remove permanent property features. Temporary campaign elements are allowed. Do not include text or brand marks in the starter prompt; the user can explicitly add those in the editable field.",
           "Use only the supplied property facts. Every sentence should earn its place."
         ].join(" "),
         input: { property, settings },
