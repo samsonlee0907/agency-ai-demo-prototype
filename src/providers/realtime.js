@@ -1,6 +1,9 @@
 import { DefaultAzureCredential } from "@azure/identity";
 
-const REALTIME_SCOPE = "https://ai.azure.com/.default";
+const REALTIME_SCOPES = [
+  "https://ai.azure.com/.default",
+  "https://cognitiveservices.azure.com/.default"
+];
 
 export class RealtimeResponseError extends Error {
   constructor(message, cause) {
@@ -55,40 +58,50 @@ export function createRealtimeProvider(config, options = {}) {
 
   return {
     async createClientSecret(building) {
-      let response;
-      try {
-        const token = await credential.getToken(REALTIME_SCOPE);
-        if (!token?.token) throw new Error("Microsoft Entra ID did not return an access token.");
-        response = await fetchImpl(buildRealtimeClientSecretUrl(config.endpoint), {
-          method: "POST",
-          headers: {
-            Authorization: ["Bearer", token.token].join(" "),
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            session: buildRealtimeSession(building, config.deployment)
-          }),
-          signal: AbortSignal.timeout(30000)
-        });
-      } catch (error) {
-        throw new RealtimeResponseError(`Realtime session request failed: ${error.message}`, error);
-      }
+      for (const [index, scope] of REALTIME_SCOPES.entries()) {
+        let response;
+        try {
+          const token = await credential.getToken(scope);
+          if (!token?.token) throw new Error("Microsoft Entra ID did not return an access token.");
+          response = await fetchImpl(buildRealtimeClientSecretUrl(config.endpoint), {
+            method: "POST",
+            headers: {
+              Authorization: ["Bearer", token.token].join(" "),
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              session: buildRealtimeSession(building, config.deployment)
+            }),
+            signal: AbortSignal.timeout(30000)
+          });
+        } catch (error) {
+          throw new RealtimeResponseError(`Realtime session request failed: ${error.message}`, error);
+        }
 
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok) {
+          if (typeof payload.value !== "string" || !payload.value) {
+            throw new RealtimeResponseError("Realtime session response did not contain an ephemeral client secret.");
+          }
+          return {
+            clientSecret: payload.value,
+            expiresAt: payload.expires_at,
+            endpoint: config.endpoint,
+            deployment: config.deployment
+          };
+        }
+
         const detail = payload?.error?.message || `${response.status} ${response.statusText}`;
-        throw new RealtimeResponseError(`Realtime session request failed: ${detail}`);
+        const audienceRetry = index === 0 && (
+          response.status === 401
+          || response.status === 403
+          || /realtime operation does not work with the specified model/i.test(detail)
+        );
+        if (!audienceRetry) {
+          throw new RealtimeResponseError(`Realtime session request failed: ${detail}`);
+        }
       }
-      if (typeof payload.value !== "string" || !payload.value) {
-        throw new RealtimeResponseError("Realtime session response did not contain an ephemeral client secret.");
-      }
-
-      return {
-        clientSecret: payload.value,
-        expiresAt: payload.expires_at,
-        endpoint: config.endpoint,
-        deployment: config.deployment
-      };
+      throw new RealtimeResponseError("Realtime session request failed for all supported Microsoft Entra audiences.");
     }
   };
 }

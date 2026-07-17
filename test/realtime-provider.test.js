@@ -67,6 +67,48 @@ test("mints an ephemeral secret using an Entra bearer token", async () => {
   });
 });
 
+test("retries with the Cognitive Services audience when the AI audience masks the deployment", async () => {
+  const scopes = [];
+  let calls = 0;
+  const provider = createRealtimeProvider(
+    {
+      configured: true,
+      endpoint: "https://contoso.openai.azure.com",
+      deployment: "gpt-realtime-2.1"
+    },
+    {
+      credential: {
+        async getToken(scope) {
+          scopes.push(scope);
+          return { token: `token-${scopes.length}` };
+        }
+      },
+      async fetchImpl() {
+        calls += 1;
+        if (calls === 1) {
+          return new Response(JSON.stringify({
+            error: { message: "The realtime operation does not work with the specified model." }
+          }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" }
+          });
+        }
+        return new Response(JSON.stringify({ value: "ephemeral", expires_at: 1234 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        });
+      }
+    }
+  );
+
+  const result = await provider.createClientSecret(building);
+  assert.deepEqual(scopes, [
+    "https://ai.azure.com/.default",
+    "https://cognitiveservices.azure.com/.default"
+  ]);
+  assert.equal(result.clientSecret, "ephemeral");
+});
+
 test("does not return success-shaped output when Azure rejects the session", async () => {
   const provider = createRealtimeProvider(
     {
