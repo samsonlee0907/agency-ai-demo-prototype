@@ -11,7 +11,7 @@ A lightweight, client-facing web app demonstrating eight Microsoft Foundry use c
 7. **Predictive maintenance and energy** — correlates fictional BMS and condition signals into explainable failure risk, energy impact and technician-ready actions.
 8. **ESG and sustainability copilot** — calculates portfolio KPIs, identifies evidence gaps and prepares a management review draft with owned next actions.
 
-The app works immediately with deterministic mock data. Live mode uses GPT-5.4 and MAI-Image-2.5 through server-side providers, so browser code never receives model credentials.
+The app works immediately with deterministic mock data. Live mode uses GPT-5.6 Terra and MAI-Image-2.5 through server-side providers, so browser code never receives model credentials.
 
 ## Run locally
 
@@ -46,7 +46,7 @@ You can alternatively copy `.env.example` to `.env` and edit it manually. Mock r
 | `GPT_ENDPOINT` | — | Azure OpenAI resource endpoint |
 | `GPT_AUTH_MODE` | `api-key` | `api-key` or `entra` |
 | `GPT_API_KEY` | — | Server-side Azure OpenAI API key |
-| `GPT_DEPLOYMENT` | `gpt-5.4` | Azure deployment name |
+| `GPT_DEPLOYMENT` | `gpt-5.6-terra` | Azure deployment name |
 | `MAI_ENDPOINT` | — | Foundry endpoint; may be a separate resource |
 | `MAI_AUTH_MODE` | `api-key` | `api-key` or `entra` |
 | `MAI_API_KEY` | — | Server-side MAI API key |
@@ -110,4 +110,4 @@ test/                         focused unit and API smoke tests
 
 `GET /api/status` reports only model readiness and deployment names—never endpoints or secrets. Live provider failures return explicit API errors and are never replaced with mock success.
 
-`POST /api/valuation`, `POST /api/lease`, `POST /api/assistant`, `POST /api/maintenance` and `POST /api/esg` use the same server-side GPT-5.4 Responses provider and strict schema validation as the original scenarios. Comparable sales, leases, buildings, telemetry and sustainability records are fictional demo data. Predictive-maintenance readings and ESG metrics are calculated and restored from server evidence after generation, so GPT explains the data without replacing source facts. All advisory, legal, maintenance and sustainability outputs require appropriate professional review.
+`POST /api/valuation`, `POST /api/lease`, `POST /api/assistant`, `POST /api/maintenance` and `POST /api/esg` use the same server-side GPT-5.6 Terra Responses provider and strict schema validation as the original scenarios. Comparable sales, leases, buildings, telemetry and sustainability records are fictional demo data. Predictive-maintenance readings and ESG metrics are calculated and restored from server evidence after generation, so GPT explains the data without replacing source facts. All advisory, legal, maintenance and sustainability outputs require appropriate professional review.

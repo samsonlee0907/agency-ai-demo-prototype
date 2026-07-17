@@ -73,7 +73,7 @@ export function getConfig(env = process.env) {
     gpt: {
       endpoint: gptEndpoint,
       apiKey: String(env.GPT_API_KEY || "").trim(),
-      deployment: String(env.GPT_DEPLOYMENT || "gpt-5.4").trim(),
+      deployment: String(env.GPT_DEPLOYMENT || "gpt-5.6-terra").trim(),
       authMode: env.GPT_AUTH_MODE === "entra" ? "entra" : "api-key"
     },
     mai: {

@@ -50,7 +50,7 @@ test("live mode falls back explicitly when GPT credentials are incomplete", () =
     GPT_ENDPOINT: "https://contoso.openai.azure.com",
     GPT_API_KEY: "",
     GPT_AUTH_MODE: "api-key",
-    GPT_DEPLOYMENT: "gpt-5.4",
+    GPT_DEPLOYMENT: "gpt-5.6-terra",
     MAI_ENDPOINT: "",
     MAI_API_KEY: ""
   });
@@ -62,7 +62,7 @@ test("live mode falls back explicitly when GPT credentials are incomplete", () =
     requestedMode: "live",
     settingsEditable: true,
     portalAuthEnabled: false,
-    gpt: { configured: false, deployment: "gpt-5.4", authMode: "api-key" },
+    gpt: { configured: false, deployment: "gpt-5.6-terra", authMode: "api-key" },
     mai: { configured: false, model: "MAI-Image-2.5", authMode: "api-key" }
   });
 });
@@ -73,7 +73,7 @@ test("Microsoft Entra mode is configured without an API key", () => {
     GPT_ENDPOINT: "https://contoso.openai.azure.com",
     GPT_AUTH_MODE: "entra",
     GPT_API_KEY: "",
-    GPT_DEPLOYMENT: "gpt-5.4",
+    GPT_DEPLOYMENT: "gpt-5.6-terra",
     MAI_ENDPOINT: "https://contoso.services.ai.azure.com",
     MAI_AUTH_MODE: "entra",
     MAI_API_KEY: ""

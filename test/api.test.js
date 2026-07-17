@@ -19,7 +19,7 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   const settingsResponse = await fetch(`${base}/api/settings`);
   assert.equal(settingsResponse.status, 200);
   const settings = await settingsResponse.json();
-  assert.equal(settings.gpt.identifier, "gpt-5.4");
+  assert.equal(settings.gpt.identifier, process.env.GPT_DEPLOYMENT || "gpt-5.6-terra");
   assert.ok(["api-key", "entra"].includes(settings.gpt.authMode));
   assert.ok(["api-key", "entra"].includes(settings.mai.authMode));
   assert.equal("apiKey" in settings.gpt, false);
@@ -29,7 +29,7 @@ test("serves status, bootstrap data and deterministic matching", async (context)
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       defaultMode: "live",
-      gpt: { endpoint: "http://example.com/openai/v1/", identifier: "gpt-5.4", authMode: "entra", apiKey: "" },
+      gpt: { endpoint: "http://example.com/openai/v1/", identifier: "gpt-5.6-terra", authMode: "entra", apiKey: "" },
       mai: { endpoint: "", identifier: "MAI-Image-2.5", authMode: "entra", apiKey: "" }
     })
   });

@@ -8,7 +8,7 @@ import { saveSettings, settingsToEnv } from "../src/settings-store.js";
 test("portal settings preserve saved keys when replacement fields are blank", () => {
   const values = settingsToEnv({
     defaultMode: "live",
-    gpt: { endpoint: "https://gpt.example.com", authMode: "entra", apiKey: "", identifier: "gpt-5.4" },
+    gpt: { endpoint: "https://gpt.example.com", authMode: "entra", apiKey: "", identifier: "gpt-5.6-terra" },
     mai: { endpoint: "https://mai.example.com", authMode: "api-key", apiKey: "new-mai", identifier: "MAI-Image-2.5" }
   }, {
     gpt: { apiKey: "saved-gpt" },
@@ -31,7 +31,7 @@ test("settings persistence replaces managed values and preserves unrelated entri
     GPT_ENDPOINT: "https://gpt.example.com",
     GPT_AUTH_MODE: "api-key",
     GPT_API_KEY: "secret-gpt",
-    GPT_DEPLOYMENT: "gpt-5.4",
+    GPT_DEPLOYMENT: "gpt-5.6-terra",
     MAI_ENDPOINT: "https://mai.example.com",
     MAI_AUTH_MODE: "api-key",
     MAI_API_KEY: "secret-mai",

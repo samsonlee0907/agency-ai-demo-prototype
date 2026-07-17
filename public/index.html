@@ -33,7 +33,7 @@
       </form>
       <div class="status-popover" id="status-popover" hidden>
         <p class="eyebrow">Model readiness</p>
-        <div class="model-status"><span><i id="gpt-dot"></i> GPT-5.4</span><strong id="gpt-status">Checking</strong></div>
+        <div class="model-status"><span><i id="gpt-dot"></i> GPT-5.6 Terra</span><strong id="gpt-status">Checking</strong></div>
         <div class="model-status"><span><i id="mai-dot"></i> MAI-Image-2.5</span><strong id="mai-status">Checking</strong></div>
         <p>Credentials stay on the server. Mock mode never calls a model endpoint.</p>
         <button class="configure-button" id="configure-button" type="button">Configure live endpoints</button>
@@ -178,7 +178,7 @@
         <div class="results-panel">
           <div class="results-toolbar">
             <div><p class="eyebrow">Curated shortlist</p><h3 id="match-result-title">Ready when your buyer is</h3></div>
-            <span class="model-chip">GPT-5.4 reasoning</span>
+            <span class="model-chip">GPT-5.6 Terra reasoning</span>
           </div>
           <div id="match-results" class="empty-state">
             <span class="empty-icon">
@@ -425,7 +425,7 @@
           <header class="chat-header">
             <div class="assistant-avatar" aria-hidden="true"><span></span></div>
             <div><strong>Aurelia Tenant Assist</strong><span id="assistant-chat-context">Building support</span></div>
-            <span class="model-chip">GPT-5.4 · grounded</span>
+            <span class="model-chip">GPT-5.6 Terra · grounded</span>
           </header>
           <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
           <form class="chat-composer" id="assistant-form">
@@ -553,7 +553,7 @@
       <span><strong>Aurelia</strong><small>Agency AI Studio</small></span>
     </a>
     <p>Property intelligence, thoughtfully applied.</p>
-    <span>Powered by GPT-5.4 + MAI-Image-2.5</span>
+    <span>Powered by GPT-5.6 Terra + MAI-Image-2.5</span>
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
@@ -580,7 +580,7 @@
       </div>
     </div>
     <details class="lease-preview-raw" id="lease-preview-raw">
-      <summary>View pre-extracted raw text sent to GPT-5.4</summary>
+      <summary>View pre-extracted raw text sent to GPT-5.6 Terra</summary>
       <pre id="lease-preview-content" tabindex="0"></pre>
     </details>
     <div class="dialog-actions">
@@ -607,7 +607,7 @@
       </label>
 
       <fieldset>
-        <legend>GPT-5.4 · Azure OpenAI Responses API</legend>
+        <legend>GPT-5.6 Terra · Azure OpenAI Responses API</legend>
         <label>Authentication
           <select name="gptAuthMode" id="gpt-auth-mode">
             <option value="entra">Microsoft Entra ID (recommended)</option>
@@ -619,7 +619,7 @@
         </label>
         <div class="field-grid">
           <label>Deployment
-            <input name="gptIdentifier" required value="gpt-5.4">
+            <input name="gptIdentifier" required value="gpt-5.6-terra">
           </label>
           <label id="gpt-api-key-field">API key
             <input name="gptApiKey" type="password" autocomplete="new-password" placeholder="Enter key">

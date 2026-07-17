@@ -282,7 +282,7 @@ function renderLeaseSource() {
       <button class="lease-preview-button" type="button" id="preview-lease-source">${hasPdf ? "Preview PDF" : "Preview source"}</button>
     </div>
     <p>${escapeHtml(lease.source)}</p>
-    <div class="lease-source-notice">${hasPdf ? "PDF asset available · matching pre-extracted raw text is sent to GPT-5.4" : "Source text fixture · no binary PDF is stored for this sample"}</div>
+    <div class="lease-source-notice">${hasPdf ? "PDF asset available · matching pre-extracted raw text is sent to GPT-5.6 Terra" : "Source text fixture · no binary PDF is stored for this sample"}</div>
     <pre>${escapeHtml(excerpt)}</pre>
   `;
   $("#preview-lease-source").addEventListener("click", () => openLeasePreview(lease));
@@ -297,8 +297,8 @@ function openLeasePreview(lease) {
   $("#lease-preview-label").textContent = hasPdf ? "PDF document preview" : "Demo source transcript";
   $("#lease-preview-notice-title").textContent = hasPdf ? "Extraction path" : "Preview limitation";
   $("#lease-preview-notice-text").textContent = hasPdf
-    ? "The embedded PDF is available for inspection. GPT-5.4 receives the matching pre-extracted raw text shown below, not the binary PDF."
-    : "This sample has no stored PDF binary. The complete fictional text supplied to GPT-5.4 is shown below.";
+    ? "The embedded PDF is available for inspection. GPT-5.6 Terra receives the matching pre-extracted raw text shown below, not the binary PDF."
+    : "This sample has no stored PDF binary. The complete fictional text supplied to GPT-5.6 Terra is shown below.";
   const pdfPreview = $("#lease-preview-pdf");
   const pdfFrame = $("#lease-preview-frame");
   const pdfLinks = [$("#lease-preview-open"), $("#lease-preview-download")];

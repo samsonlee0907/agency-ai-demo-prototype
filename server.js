@@ -244,7 +244,7 @@ app.post("/api/assistant", async (request, response, next) => {
     const { mode, buildingId, message, history } = assistantRequestSchema.parse(request.body);
     const building = resolveBuilding(buildingId);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").respondToTenant(building, message, history)
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).respondToTenant(building, message, history)
       : answerTenant(buildingId, message, history);
     response.json({ mode, buildingId, ...output });
   } catch (error) {
@@ -302,7 +302,7 @@ app.post("/api/match", async (request, response, next) => {
   try {
     const { mode, brief } = matchRequestSchema.parse(request.body);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").rankProperties(brief, listings)
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).rankProperties(brief, listings)
       : matchProperties(brief);
     response.json({ mode, ...output });
   } catch (error) {
@@ -315,7 +315,7 @@ app.post("/api/marketing", async (request, response, next) => {
     const { mode, propertyId, settings } = marketingRequestSchema.parse(request.body);
     const property = resolveListing(propertyId);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").generateMarketing(property, settings)
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).generateMarketing(property, settings)
       : generateMarketing(propertyId, settings);
     response.json({ mode, propertyId, ...output });
   } catch (error) {
@@ -328,7 +328,7 @@ app.post("/api/qualify", async (request, response, next) => {
     const { mode, leadId } = qualificationRequestSchema.parse(request.body);
     const lead = resolveLead(leadId);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").qualifyLead(lead, resolveListing(lead.propertyId))
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).qualifyLead(lead, resolveListing(lead.propertyId))
       : qualifyLead(leadId);
     response.json({ mode, leadId, ...output });
   } catch (error) {
@@ -360,7 +360,7 @@ app.post("/api/valuation", async (request, response, next) => {
     const { mode, propertyId, settings } = valuationRequestSchema.parse(request.body);
     const property = resolveListing(propertyId);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").draftValuation(property, settings, comparableSales)
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).draftValuation(property, settings, comparableSales)
       : draftValuation(propertyId, settings);
     response.json({ mode, propertyId, ...output });
   } catch (error) {
@@ -373,7 +373,7 @@ app.post("/api/lease", async (request, response, next) => {
     const { mode, leaseId } = leaseRequestSchema.parse(request.body);
     const lease = resolveLease(leaseId);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").abstractLease(lease)
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).abstractLease(lease)
       : abstractLease(leaseId);
     response.json({ mode, leaseId, ...output });
   } catch (error) {
@@ -387,7 +387,7 @@ app.post("/api/maintenance", async (request, response, next) => {
     const asset = resolveMaintenanceAsset(assetId);
     const baseline = analyseMaintenance(assetId, horizon);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").analyseMaintenance(asset, horizon, baseline)
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).analyseMaintenance(asset, horizon, baseline)
       : baseline;
     response.json({ mode, assetId, ...output });
   } catch (error) {
@@ -400,7 +400,7 @@ app.post("/api/esg", async (request, response, next) => {
     const { mode, settings } = esgRequestSchema.parse(request.body);
     const evidence = buildEsgEvidence(settings);
     const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, "GPT-5.4").draftEsgReport(settings, evidence)
+      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).draftEsgReport(settings, evidence)
       : createEsgReport(settings);
     response.json({ mode, ...output });
   } catch (error) {
