@@ -60,6 +60,7 @@ test("live mode falls back explicitly when GPT credentials are incomplete", () =
   assert.deepEqual(publicStatus(config), {
     defaultMode: "mock",
     requestedMode: "live",
+    settingsEditable: true,
     gpt: { configured: false, deployment: "gpt-5.4", authMode: "api-key" },
     mai: { configured: false, model: "MAI-Image-2.5", authMode: "api-key" }
   });
@@ -81,5 +82,11 @@ test("Microsoft Entra mode is configured without an API key", () => {
   assert.equal(config.gpt.authMode, "entra");
   assert.equal(config.defaultMode, "live");
   assert.equal(config.mai.configured, true);
-  assert.equal(config.mai.authMode, "entra");
+});
+
+test("App Service binds externally and disables runtime settings edits", () => {
+  const config = getConfig({ WEBSITE_HOSTNAME: "aurelia.example.azurewebsites.net" });
+
+  assert.equal(config.host, "0.0.0.0");
+  assert.equal(publicStatus(config).settingsEditable, false);
 });

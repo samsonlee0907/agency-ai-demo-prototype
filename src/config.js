@@ -53,6 +53,8 @@ export function getConfig(env = process.env) {
 
   const config = {
     port: Number.parseInt(env.PORT || "3000", 10),
+    host: String(env.HOST || (env.WEBSITE_HOSTNAME ? "0.0.0.0" : "127.0.0.1")).trim(),
+    settingsEditable: !env.WEBSITE_HOSTNAME,
     requestedMode,
     gpt: {
       endpoint: gptEndpoint,
@@ -82,6 +84,7 @@ export function publicStatus(config) {
   return {
     defaultMode: config.defaultMode,
     requestedMode: config.requestedMode,
+    settingsEditable: config.settingsEditable,
     gpt: {
       configured: config.gpt.configured,
       deployment: config.gpt.deployment,

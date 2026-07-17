@@ -113,6 +113,7 @@ function renderStatus() {
   $("#gpt-dot").classList.toggle("ready", status.gpt.configured);
   $("#mai-dot").classList.toggle("ready", status.mai.configured);
   $('[data-mode="live"]').disabled = !status.gpt.configured;
+  $("#configure-button").hidden = !status.settingsEditable;
   updateMode(status.defaultMode);
 }
 

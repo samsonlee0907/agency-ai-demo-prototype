@@ -320,7 +320,7 @@ app.use((error, _request, response, _next) => {
 });
 
 export function startServer(port = runtime.config.port) {
-  return app.listen(port, "127.0.0.1", () => {
+  return app.listen(port, runtime.config.host, () => {
     console.log(`Aurelia Agency AI is running at http://localhost:${port}`);
     console.log(`Mode: ${runtime.config.defaultMode} | GPT: ${runtime.config.gpt.configured ? "configured" : "not configured"} | MAI: ${runtime.config.mai.configured ? "configured" : "not configured"}`);
   });
