@@ -1,0 +1,65 @@
+:root {
+  color-scheme: light;
+  --navy: #071722;
+  --navy-soft: #173342;
+  --gold: #aa7624;
+  --ivory: #f6f1e6;
+  --paper: #fffdf8;
+  --line: #d8d1c4;
+  --muted: #66737b;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 15% 12%, rgba(170, 118, 36, .13), transparent 28rem),
+    linear-gradient(135deg, #f8f4eb, #e9eef0);
+  color: var(--navy);
+  font-family: Inter, "Segoe UI", sans-serif;
+}
+
+.login-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(440px, 100%);
+  padding: 42px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: 0 24px 70px rgba(7, 23, 34, .14);
+}
+
+.brand-mark {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 28px;
+  place-items: center;
+  background: var(--navy);
+  color: white;
+}
+
+.brand-mark svg { width: 27px; fill: currentColor; }
+.eyebrow { margin: 0 0 8px; color: var(--gold); font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+h1 { margin: 0; font-family: Georgia, serif; font-size: clamp(32px, 7vw, 44px); font-weight: 400; line-height: 1.05; }
+.intro { margin: 16px 0 28px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.login-error:empty { display: none; }
+.login-error { margin: 0 0 18px; padding: 11px 13px; border-left: 3px solid #a13b2c; background: #fff0ed; color: #75291e; font-size: 13px; }
+form { display: grid; gap: 18px; }
+label { display: grid; gap: 7px; color: var(--navy-soft); font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+input { width: 100%; padding: 13px 14px; border: 1px solid var(--line); background: white; color: var(--navy); font: inherit; font-size: 15px; }
+input:focus { border-color: var(--gold); outline: 2px solid rgba(170, 118, 36, .18); outline-offset: 1px; }
+button { margin-top: 4px; padding: 14px 18px; border: 0; background: var(--navy); color: white; font: inherit; font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+button:hover { background: var(--navy-soft); }
+.security-note { margin: 24px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+
+@media (max-width: 520px) {
+  .login-card { padding: 30px 24px; }
+}

@@ -61,6 +61,7 @@ test("live mode falls back explicitly when GPT credentials are incomplete", () =
     defaultMode: "mock",
     requestedMode: "live",
     settingsEditable: true,
+    portalAuthEnabled: false,
     gpt: { configured: false, deployment: "gpt-5.4", authMode: "api-key" },
     mai: { configured: false, model: "MAI-Image-2.5", authMode: "api-key" }
   });
@@ -89,4 +90,22 @@ test("App Service binds externally and disables runtime settings edits", () => {
 
   assert.equal(config.host, "0.0.0.0");
   assert.equal(publicStatus(config).settingsEditable, false);
+});
+
+test("portal authentication requires a complete secure configuration", () => {
+  assert.throws(
+    () => getConfig({ PORTAL_CREDENTIAL_HASH: "scrypt$salt$hash" }),
+    /requires both/
+  );
+  assert.throws(
+    () => getConfig({ PORTAL_CREDENTIAL_HASH: "scrypt$salt$hash", PORTAL_SESSION_SECRET: "short" }),
+    /at least 32/
+  );
+
+  const config = getConfig({
+    PORTAL_CREDENTIAL_HASH: "scrypt$salt$hash",
+    PORTAL_SESSION_SECRET: "a".repeat(32)
+  });
+  assert.equal(config.portalAuth.enabled, true);
+  assert.equal(publicStatus(config).portalAuthEnabled, true);
 });

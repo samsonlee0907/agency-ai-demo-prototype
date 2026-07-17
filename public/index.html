@@ -28,6 +28,9 @@
         <span class="status-dot"></span>
         <span id="status-label">Connecting…</span>
       </button>
+      <form class="logout-form" id="logout-form" method="post" action="/auth/logout" hidden>
+        <button type="submit">Sign out</button>
+      </form>
       <div class="status-popover" id="status-popover" hidden>
         <p class="eyebrow">Model readiness</p>
         <div class="model-status"><span><i id="gpt-dot"></i> GPT-5.4</span><strong id="gpt-status">Checking</strong></div>

@@ -50,12 +50,26 @@ export function getConfig(env = process.env) {
   const gptEndpoint = normalizeAzureOpenAIBaseUrl(env.GPT_ENDPOINT);
   const maiEndpoint = normalizeMaiEndpoint(env.MAI_ENDPOINT);
   const requestedMode = env.MODEL_MODE === "live" ? "live" : "mock";
+  const portalCredentialHash = String(env.PORTAL_CREDENTIAL_HASH || "").trim();
+  const portalSessionSecret = String(env.PORTAL_SESSION_SECRET || "").trim();
+
+  if (Boolean(portalCredentialHash) !== Boolean(portalSessionSecret)) {
+    throw new Error("Portal authentication requires both PORTAL_CREDENTIAL_HASH and PORTAL_SESSION_SECRET.");
+  }
+  if (portalSessionSecret && portalSessionSecret.length < 32) {
+    throw new Error("PORTAL_SESSION_SECRET must contain at least 32 characters.");
+  }
 
   const config = {
     port: Number.parseInt(env.PORT || "3000", 10),
     host: String(env.HOST || (env.WEBSITE_HOSTNAME ? "0.0.0.0" : "127.0.0.1")).trim(),
     settingsEditable: !env.WEBSITE_HOSTNAME,
     requestedMode,
+    portalAuth: {
+      enabled: Boolean(portalCredentialHash && portalSessionSecret),
+      credentialHash: portalCredentialHash,
+      sessionSecret: portalSessionSecret
+    },
     gpt: {
       endpoint: gptEndpoint,
       apiKey: String(env.GPT_API_KEY || "").trim(),
@@ -85,6 +99,7 @@ export function publicStatus(config) {
     defaultMode: config.defaultMode,
     requestedMode: config.requestedMode,
     settingsEditable: config.settingsEditable,
+    portalAuthEnabled: config.portalAuth.enabled,
     gpt: {
       configured: config.gpt.configured,
       deployment: config.gpt.deployment,

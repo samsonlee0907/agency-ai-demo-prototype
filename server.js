@@ -11,6 +11,12 @@ import { esgPortfolio, findMaintenanceAsset, maintenanceAssets } from "./src/ope
 import { createGptProvider, ModelResponseError } from "./src/providers/gpt.js";
 import { createMaiImageProvider } from "./src/providers/mai-image.js";
 import { createCampaignEditPrompt } from "./src/property-image-prompts.js";
+import {
+  createPortalSessionToken,
+  readPortalSessionCookie,
+  verifyPortalCredential,
+  verifyPortalSessionToken
+} from "./src/portal-auth.js";
 import { saveSettings, settingsToEnv } from "./src/settings-store.js";
 import {
   assistantRequestSchema,
@@ -28,8 +34,12 @@ import {
 const app = express();
 const root = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.join(root, ".env");
+const loginPath = path.join(root, "public", "login.html");
 const runtime = {};
 let settingsUpdateQueue = Promise.resolve();
+const loginAttempts = new Map();
+const loginWindowMs = 15 * 60 * 1000;
+const loginAttemptLimit = 5;
 
 function applyConfig(env = process.env) {
   runtime.config = getConfig(env);
@@ -60,7 +70,103 @@ function resolveMaintenanceAsset(id) {
 applyConfig();
 
 app.disable("x-powered-by");
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "1mb" }));
+app.use(express.urlencoded({ extended: false, limit: "10kb" }));
+app.use((_request, response, next) => {
+  response.setHeader("X-Content-Type-Options", "nosniff");
+  response.setHeader("Referrer-Policy", "no-referrer");
+  response.setHeader("X-Frame-Options", "DENY");
+  next();
+});
+
+function hasPortalSession(request) {
+  const token = readPortalSessionCookie(request.headers.cookie);
+  return verifyPortalSessionToken(token, runtime.config.portalAuth.sessionSecret);
+}
+
+async function sendLoginPage(response, status = 200, error = "") {
+  const template = await readFile(loginPath, "utf8");
+  const escapedError = error.replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;"
+  })[character]);
+  response.status(status).type("html").send(template.replace("{{LOGIN_ERROR}}", escapedError));
+}
+
+function loginAttemptState(address, now = Date.now()) {
+  const existing = loginAttempts.get(address);
+  if (!existing || now - existing.startedAt >= loginWindowMs) {
+    const state = { failures: 0, startedAt: now };
+    loginAttempts.set(address, state);
+    return state;
+  }
+  return existing;
+}
+
+app.get("/login.css", (_request, response) => {
+  response.sendFile(path.join(root, "public", "login.css"));
+});
+
+app.get("/login", async (request, response) => {
+  if (!runtime.config.portalAuth.enabled || hasPortalSession(request)) {
+    response.redirect(302, "/");
+    return;
+  }
+  await sendLoginPage(response);
+});
+
+app.post("/auth/login", async (request, response) => {
+  if (!runtime.config.portalAuth.enabled) {
+    response.status(404).send("Portal authentication is not configured.");
+    return;
+  }
+
+  const attempts = loginAttemptState(request.ip);
+  if (attempts.failures >= loginAttemptLimit) {
+    await sendLoginPage(response, 429, "Too many failed attempts. Try again in 15 minutes.");
+    return;
+  }
+
+  const valid = verifyPortalCredential(
+    request.body.username,
+    request.body.password,
+    runtime.config.portalAuth.credentialHash
+  );
+  if (!valid) {
+    attempts.failures += 1;
+    console.warn(`Portal login rejected for ${request.ip}.`);
+    await sendLoginPage(response, 401, "The username or password is incorrect.");
+    return;
+  }
+
+  loginAttempts.delete(request.ip);
+  const maxAgeSeconds = 8 * 60 * 60;
+  const token = createPortalSessionToken(runtime.config.portalAuth.sessionSecret, maxAgeSeconds);
+  response.setHeader("Set-Cookie", `aurelia_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`);
+  response.redirect(303, "/");
+});
+
+app.post("/auth/logout", (_request, response) => {
+  response.setHeader("Set-Cookie", "aurelia_session=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0");
+  response.redirect(303, "/login");
+});
+
+app.use((request, response, next) => {
+  if (!runtime.config.portalAuth.enabled || hasPortalSession(request)) {
+    next();
+    return;
+  }
+  if (request.path.startsWith("/api/")) {
+    response.status(401).json({ error: "Authentication required." });
+    return;
+  }
+  response.redirect(302, "/login");
+});
+
 app.use(express.static(path.join(root, "public"), {
   etag: true,
   maxAge: process.env.NODE_ENV === "production" ? "1h" : 0

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Sign in · Aurelia Agency AI</title>
+  <link rel="stylesheet" href="/login.css">
+</head>
+<body>
+  <main class="login-shell">
+    <section class="login-card" aria-labelledby="login-title">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><path d="M16 3 28 10v12l-12 7L4 22V10l12-7Zm0 5-7 4v8l7 4 7-4v-8l-7-4Z"/></svg>
+      </div>
+      <p class="eyebrow">Aurelia · Agency AI Studio</p>
+      <h1 id="login-title">Private demonstration</h1>
+      <p class="intro">Sign in with the shared demonstration credential.</p>
+      <p class="login-error" role="alert">{{LOGIN_ERROR}}</p>
+      <form method="post" action="/auth/login">
+        <label>Username
+          <input name="username" type="text" autocomplete="username" required autofocus>
+        </label>
+        <label>Password
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit">Enter studio</button>
+      </form>
+      <p class="security-note">Credentials are verified server-side and are never included in browser code.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -98,6 +98,8 @@ a { color: inherit; }
 .brand small { display: block; margin-top: 5px; color: var(--ink-muted); font-size: 8px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; }
 
 .header-actions { position: relative; display: flex; align-items: center; gap: 12px; }
+.logout-form button { padding: 9px 12px; border: 1px solid rgba(255,255,255,.32); background: transparent; color: white; font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.logout-form button:hover { border-color: var(--gold); color: var(--gold-light); }
 
 .mode-switcher {
   display: flex;
@@ -866,6 +868,8 @@ footer > span { justify-self: end; color: #81909a; font-size: 8px; font-weight: 
   .brand small { display: none; }
   .status-button { padding: 9px; }
   .status-button #status-label { display: none; }
+  .logout-form button { padding: 9px; font-size: 0; }
+  .logout-form button::after { content: "Exit"; font-size: 8px; }
   .hero { padding: 45px 20px 55px; }
   .hero-copy { min-width: 0; }
   .hero-lede { max-width: 100%; font-size: 16px; overflow-wrap: anywhere; }

@@ -114,6 +114,7 @@ function renderStatus() {
   $("#mai-dot").classList.toggle("ready", status.mai.configured);
   $('[data-mode="live"]').disabled = !status.gpt.configured;
   $("#configure-button").hidden = !status.settingsEditable;
+  $("#logout-form").hidden = !status.portalAuthEnabled;
   updateMode(status.defaultMode);
 }
 
