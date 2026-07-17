@@ -16,6 +16,16 @@ export function buildRealtimeClientSecretUrl(endpoint) {
   return `${String(endpoint).replace(/\/+$/, "")}/openai/v1/realtime/client_secrets`;
 }
 
+export function buildRealtimeCallsEndpoint(endpoint) {
+  const parsed = new URL(endpoint);
+  if (parsed.hostname.endsWith(".services.ai.azure.com")) {
+    parsed.hostname = parsed.hostname.replace(/\.services\.ai\.azure\.com$/, ".openai.azure.com");
+  } else if (parsed.hostname.endsWith(".cognitiveservices.azure.com")) {
+    parsed.hostname = parsed.hostname.replace(/\.cognitiveservices\.azure\.com$/, ".openai.azure.com");
+  }
+  return parsed.origin;
+}
+
 export function buildRealtimeSession(building, deployment) {
   const knowledge = building.knowledge
     .map((item) => `${item.title}: ${item.content}`)
@@ -86,7 +96,7 @@ export function createRealtimeProvider(config, options = {}) {
           return {
             clientSecret: payload.value,
             expiresAt: payload.expires_at,
-            endpoint: config.endpoint,
+            endpoint: buildRealtimeCallsEndpoint(config.endpoint),
             deployment: config.deployment
           };
         }

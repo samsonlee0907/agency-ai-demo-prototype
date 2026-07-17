@@ -53,9 +53,7 @@ export function normalizeRealtimeEndpoint(value) {
   const parsed = new URL(raw);
   assertSecureEndpoint(parsed);
   if (parsed.hostname.endsWith(".services.ai.azure.com")) {
-    parsed.hostname = parsed.hostname.replace(/\.services\.ai\.azure\.com$/, ".openai.azure.com");
-  } else if (parsed.hostname.endsWith(".cognitiveservices.azure.com")) {
-    parsed.hostname = parsed.hostname.replace(/\.cognitiveservices\.azure\.com$/, ".openai.azure.com");
+    parsed.hostname = parsed.hostname.replace(/\.services\.ai\.azure\.com$/, ".cognitiveservices.azure.com");
   }
   parsed.pathname = "";
   parsed.search = "";

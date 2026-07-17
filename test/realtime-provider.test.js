@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildRealtimeCallsEndpoint,
   buildRealtimeClientSecretUrl,
   buildRealtimeSession,
   createRealtimeProvider,
@@ -30,12 +31,23 @@ test("builds a grounded realtime session with server VAD and emergency guidance"
   assert.match(session.instructions, /Do not claim that a work order/);
 });
 
+test("uses the native hostname for token minting and the OpenAI hostname for WebRTC", () => {
+  assert.equal(
+    buildRealtimeClientSecretUrl("https://contoso.cognitiveservices.azure.com"),
+    "https://contoso.cognitiveservices.azure.com/openai/v1/realtime/client_secrets"
+  );
+  assert.equal(
+    buildRealtimeCallsEndpoint("https://contoso.cognitiveservices.azure.com"),
+    "https://contoso.openai.azure.com"
+  );
+});
+
 test("mints an ephemeral secret using an Entra bearer token", async () => {
   let request;
   const provider = createRealtimeProvider(
     {
       configured: true,
-      endpoint: "https://contoso.openai.azure.com",
+      endpoint: "https://contoso.cognitiveservices.azure.com",
       deployment: "gpt-realtime-2.1"
     },
     {
@@ -56,7 +68,7 @@ test("mints an ephemeral secret using an Entra bearer token", async () => {
   );
 
   const result = await provider.createClientSecret(building);
-  assert.equal(request.url, buildRealtimeClientSecretUrl("https://contoso.openai.azure.com"));
+  assert.equal(request.url, buildRealtimeClientSecretUrl("https://contoso.cognitiveservices.azure.com"));
   assert.equal(request.options.headers.Authorization, ["Bearer", "entra-token"].join(" "));
   assert.equal(JSON.parse(request.options.body).session.model, "gpt-realtime-2.1");
   assert.deepEqual(result, {

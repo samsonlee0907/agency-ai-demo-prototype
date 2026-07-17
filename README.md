@@ -47,7 +47,7 @@ You can alternatively copy `.env.example` to `.env` and edit it manually. Mock r
 | `GPT_AUTH_MODE` | `api-key` | `api-key` or `entra` |
 | `GPT_API_KEY` | — | Server-side Azure OpenAI API key |
 | `GPT_DEPLOYMENT` | `gpt-5.6-terra` | Azure deployment name |
-| `REALTIME_ENDPOINT` | — | Azure OpenAI resource endpoint for WebRTC |
+| `REALTIME_ENDPOINT` | — | Azure OpenAI or Cognitive Services resource endpoint |
 | `REALTIME_DEPLOYMENT` | `gpt-realtime-2.1` | Realtime model deployment name |
 | `MAI_ENDPOINT` | — | Foundry endpoint; may be a separate resource |
 | `MAI_AUTH_MODE` | `api-key` | `api-key` or `entra` |
@@ -77,11 +77,11 @@ For resources with key authentication disabled, choose **Microsoft Entra ID** fo
 Tenant voice follows Microsoft's current [Azure OpenAI Realtime WebRTC guidance](https://learn.microsoft.com/azure/foundry/openai/how-to/realtime-audio-webrtc):
 
 1. The authenticated browser requests `POST /api/realtime/client-secret` with a selected building identifier.
-2. The server validates the building, grounds the session in its fictional service guide, and uses `DefaultAzureCredential` to call `POST /openai/v1/realtime/client_secrets`.
+2. The server validates the building, grounds the session in its fictional service guide, and uses `DefaultAzureCredential` to call `POST /openai/v1/realtime/client_secrets` on the configured resource endpoint.
 3. The browser receives only the short-lived client secret and negotiates WebRTC directly with `POST /openai/v1/realtime/calls?webrtcfilter=on`.
 4. Microphone, peer connection, media tracks and remote audio are closed when voice stops, the building changes, or the user leaves the assistant.
 
-`REALTIME_ENDPOINT` and `REALTIME_DEPLOYMENT` are server-side settings. Realtime authentication is always Microsoft Entra ID; no realtime API-key setting is supported. The App Service managed identity needs inference access to the Foundry resource. Server VAD supports natural turn-taking and interruption, while the WebRTC event filter prevents session instructions from being returned over the browser data channel. Credential minting is disabled unless portal authentication is configured and is limited to eight sessions per client every 10 minutes.
+`REALTIME_ENDPOINT` and `REALTIME_DEPLOYMENT` are server-side settings. The server accepts the resource's `*.cognitiveservices.azure.com` endpoint for token minting and returns the corresponding `*.openai.azure.com` endpoint for the browser's GA WebRTC call. Realtime authentication is always Microsoft Entra ID; no realtime API-key setting is supported. The App Service managed identity needs inference access to the Foundry resource. Server VAD supports natural turn-taking and interruption, while the WebRTC event filter prevents session instructions from being returned over the browser data channel. Credential minting is disabled unless portal authentication is configured and is limited to eight sessions per client every 10 minutes.
 
 MAI routing is isolated in `src/providers/mai-image.js`, following the route used by the referenced Microsoft model portal:
 

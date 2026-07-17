@@ -37,11 +37,11 @@ test("normalizes MAI endpoint when a full generation route is supplied", () => {
 test("normalizes Foundry resource endpoints for realtime WebRTC", () => {
   assert.equal(
     normalizeRealtimeEndpoint("https://contoso.services.ai.azure.com/openai/v1/realtime/calls"),
-    "https://contoso.openai.azure.com"
+    "https://contoso.cognitiveservices.azure.com"
   );
   assert.equal(
     normalizeRealtimeEndpoint("https://contoso.cognitiveservices.azure.com/"),
-    "https://contoso.openai.azure.com"
+    "https://contoso.cognitiveservices.azure.com"
   );
 });
 
@@ -99,7 +99,7 @@ test("Microsoft Entra mode is configured without an API key", () => {
   assert.equal(config.defaultMode, "live");
   assert.equal(config.mai.configured, true);
   assert.equal(config.realtime.configured, true);
-  assert.equal(config.realtime.endpoint, "https://contoso.openai.azure.com");
+  assert.equal(config.realtime.endpoint, "https://contoso.cognitiveservices.azure.com");
 });
 
 test("App Service binds externally and disables runtime settings edits", () => {
