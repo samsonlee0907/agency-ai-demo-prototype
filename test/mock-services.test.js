@@ -88,6 +88,16 @@ test("tenant assistant suggestions are ready-to-send tenant confirmations", () =
   assert.ok(suggestions.every((suggestion) => !suggestion.endsWith("?")));
 });
 
+test("tenant assistant does not repeat a selected quick reply", () => {
+  const selected = "I need after-hours air conditioning.";
+  const result = answerTenant(
+    "building-meridian",
+    selected,
+    [{ role: "user", content: "The air conditioning is too warm." }]
+  );
+  assert.equal(result.suggestions.includes(selected), false);
+});
+
 test("tenant assistant citations come from the selected building context", () => {
   const building = findBuilding("building-arcade");
   const result = answerTenant(building.id, "I lost my access pass");

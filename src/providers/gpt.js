@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
+import { filterSuggestedReplies } from "../assistant-conversation.js";
 import {
   ASSISTANT_REPLY_MAX_LENGTH,
   assistantJsonSchema,
@@ -46,12 +47,8 @@ export function ensureEmergencyGuidance(result) {
   };
 }
 
-export function normalizeAssistantFollowUps(result) {
+export function normalizeAssistantFollowUps(result, history = []) {
   const questions = result.suggestions.filter((suggestion) => suggestion.trim().endsWith("?"));
-  if (!questions.length) {
-    return result;
-  }
-
   let reply = result.reply;
   for (const question of questions) {
     if (!reply.includes(question) && reply.length + question.length + 1 <= ASSISTANT_REPLY_MAX_LENGTH) {
@@ -61,7 +58,10 @@ export function normalizeAssistantFollowUps(result) {
   return {
     ...result,
     reply,
-    suggestions: result.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?"))
+    suggestions: filterSuggestedReplies(
+      result.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?")),
+      history
+    )
   };
 }
 
@@ -290,12 +290,15 @@ export function createGptProvider(config) {
     async respondToTenant(building, message, history) {
       const result = await generateStructured({
         name: "tenant_assistant_response",
-        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Ask any qualification or follow-up question directly in reply as Aurelia. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. suggestions are optional ready-to-send tenant confirmations or answer statements, such as 'Building security has been contacted.'; never put a question, an Aurelia prompt, or an instruction for support staff in suggestions, and never invent a tenant fact.",
+        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. Reason over the full conversation: acknowledge confirmed facts once, advance the task, and never repeat or lightly rephrase a prior reply, question, user message or previously offered quick reply. Do not prefix reply with 'Aurelia:'. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Ask any qualification or follow-up question directly in reply as Aurelia. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. suggestions are optional ready-to-send tenant answers or decisions that materially advance the conversation. Return an empty suggestions array when the next response requires open-ended tenant details such as a floor, area, time or description. Never offer placeholders such as 'I can confirm...' or 'I will provide...', repeat an earlier choice, put a question or Aurelia prompt in suggestions, instruct support staff, or invent a tenant fact.",
         input: { building, message, history },
         jsonSchema: assistantJsonSchema,
         outputSchema: assistantOutputSchema
       });
-      return ensureEmergencyGuidance(normalizeAssistantFollowUps(result));
+      return ensureEmergencyGuidance(normalizeAssistantFollowUps(
+        result,
+        [...history, { role: "user", content: message }]
+      ));
     },
     async analyseMaintenance(asset, horizon, baseline) {
       const result = await generateStructured({

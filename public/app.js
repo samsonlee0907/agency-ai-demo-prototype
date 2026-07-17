@@ -874,7 +874,12 @@ async function submitAssistantMessage(event) {
   const buildingId = $("#assistant-building").value;
   const history = state.assistantHistory
     .slice(-10)
-    .map((entry) => ({ role: entry.role, content: entry.content }));
+    .map((entry) => {
+      const offeredReplies = entry.role === "assistant" && entry.response?.suggestions.length
+        ? `\nPreviously offered tenant quick replies: ${entry.response.suggestions.join(" | ")}`
+        : "";
+      return { role: entry.role, content: `${entry.content}${offeredReplies}`.slice(0, 1600) };
+    });
   state.assistantPending = true;
   state.assistantHistory.push({ role: "user", content: message });
   textarea.value = "";

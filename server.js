@@ -245,7 +245,7 @@ app.post("/api/assistant", async (request, response, next) => {
     const building = resolveBuilding(buildingId);
     const output = mode === "live"
       ? await requireLiveProvider(runtime.gpt, "GPT-5.4").respondToTenant(building, message, history)
-      : answerTenant(buildingId, message);
+      : answerTenant(buildingId, message, history);
     response.json({ mode, buildingId, ...output });
   } catch (error) {
     next(error);

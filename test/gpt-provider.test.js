@@ -138,11 +138,13 @@ test("assistant qualification questions stay with Aurelia", () => {
     suggestions: [
       "Has building security been contacted?",
       "Building security has been contacted.",
-      "Which level is affected?"
+      "Which level is affected?",
+      "I can confirm the affected floor and area.",
+      "I need temporary access."
     ]
-  });
+  }, [{ role: "user", content: "Building security has been contacted." }]);
 
   assert.match(result.reply, /Has building security been contacted\?/);
   assert.match(result.reply, /Which level is affected\?/);
-  assert.deepEqual(result.suggestions, ["Building security has been contacted."]);
+  assert.deepEqual(result.suggestions, ["I need temporary access."]);
 });

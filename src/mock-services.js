@@ -1,4 +1,5 @@
 import { comparableSales, findBuilding, findLease, findListing, findLead, listings } from "./data.js";
+import { filterSuggestedReplies } from "./assistant-conversation.js";
 import { esgPortfolio, findMaintenanceAsset } from "./operations-data.js";
 
 const priorityMap = new Map([
@@ -376,15 +377,19 @@ export function abstractLease(leaseId) {
   return structuredClone(leaseAbstractionFixtures[leaseId]);
 }
 
-export function answerTenant(buildingId, message) {
+export function answerTenant(buildingId, message, history = []) {
   const building = findBuilding(buildingId);
   if (!building) throw new Error("Building not found.");
   const normalized = message.toLowerCase();
   const findKnowledge = (pattern) => building.knowledge.find((article) => pattern.test(`${article.title} ${article.content}`));
+  const finalize = (response) => ({
+    ...response,
+    suggestions: filterSuggestedReplies(response.suggestions, [...history, { role: "user", content: message }])
+  });
 
   if (/(fire|smoke|gas|serious injury|uncontrolled spill)/.test(normalized)) {
     const emergencyGuide = findKnowledge(/emergency|after-hours|fault|safety/i) || building.knowledge[0];
-    return {
+    return finalize({
       reply: `Please call emergency services on 000 now, then contact ${building.emergencyContact}. Move to a safe location and follow building warden instructions. I have not created a routine work order because this requires immediate emergency response.`,
       category: "Emergency",
       urgency: "Emergency",
@@ -392,10 +397,10 @@ export function answerTenant(buildingId, message) {
       citations: [emergencyGuide.title, building.emergencyContact],
       workOrder: { created: false, reference: "", summary: "Emergency escalation only", nextUpdate: "Not applicable" },
       suggestions: ["I have called 000.", "I am in a safe location."]
-    };
+    });
   }
 
-  return answerTenantNonEmergency(building, normalized);
+  return finalize(answerTenantNonEmergency(building, normalized));
 }
 
   function round(value, digits = 1) {
