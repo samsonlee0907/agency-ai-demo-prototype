@@ -4,7 +4,6 @@ import {
   getConfig,
   normalizeAzureOpenAIBaseUrl,
   normalizeMaiEndpoint,
-  normalizeRealtimeEndpoint,
   publicStatus
 } from "../src/config.js";
 
@@ -31,17 +30,6 @@ test("normalizes MAI endpoint when a full generation route is supplied", () => {
   assert.equal(
     normalizeMaiEndpoint("https://contoso.services.ai.azure.com/custom/base/"),
     "https://contoso.services.ai.azure.com/custom/base"
-  );
-});
-
-test("normalizes Foundry resource endpoints for realtime WebRTC", () => {
-  assert.equal(
-    normalizeRealtimeEndpoint("https://contoso.services.ai.azure.com/openai/v1/realtime/calls"),
-    "https://contoso.cognitiveservices.azure.com"
-  );
-  assert.equal(
-    normalizeRealtimeEndpoint("https://contoso.cognitiveservices.azure.com/"),
-    "https://contoso.cognitiveservices.azure.com"
   );
 });
 
@@ -75,8 +63,7 @@ test("live mode falls back explicitly when GPT credentials are incomplete", () =
     settingsEditable: true,
     portalAuthEnabled: false,
     gpt: { configured: false, deployment: "gpt-5.6-terra", authMode: "api-key" },
-    mai: { configured: false, model: "MAI-Image-2.5", authMode: "api-key" },
-    realtime: { configured: false, deployment: "gpt-realtime-2.1", authMode: "entra" }
+    mai: { configured: false, model: "MAI-Image-2.5", authMode: "api-key" }
   });
 });
 
@@ -89,17 +76,13 @@ test("Microsoft Entra mode is configured without an API key", () => {
     GPT_DEPLOYMENT: "gpt-5.6-terra",
     MAI_ENDPOINT: "https://contoso.services.ai.azure.com",
     MAI_AUTH_MODE: "entra",
-    MAI_API_KEY: "",
-    REALTIME_ENDPOINT: "https://contoso.cognitiveservices.azure.com",
-    REALTIME_DEPLOYMENT: "gpt-realtime-2.1"
+    MAI_API_KEY: ""
   });
 
   assert.equal(config.gpt.configured, true);
   assert.equal(config.gpt.authMode, "entra");
   assert.equal(config.defaultMode, "live");
   assert.equal(config.mai.configured, true);
-  assert.equal(config.realtime.configured, true);
-  assert.equal(config.realtime.endpoint, "https://contoso.cognitiveservices.azure.com");
 });
 
 test("App Service binds externally and disables runtime settings edits", () => {

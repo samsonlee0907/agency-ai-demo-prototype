@@ -15,8 +15,6 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   const status = await statusResponse.json();
   assert.ok(["mock", "live"].includes(status.defaultMode));
   assert.equal("apiKey" in status.gpt, false);
-  assert.equal("endpoint" in status.realtime, false);
-  assert.equal("clientSecret" in status.realtime, false);
 
   const settingsResponse = await fetch(`${base}/api/settings`);
   assert.equal(settingsResponse.status, 200);
@@ -25,15 +23,6 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.ok(["api-key", "entra"].includes(settings.gpt.authMode));
   assert.ok(["api-key", "entra"].includes(settings.mai.authMode));
   assert.equal("apiKey" in settings.gpt, false);
-
-  if (!status.realtime.configured) {
-    const realtimeResponse = await fetch(`${base}/api/realtime/client-secret`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ buildingId: "building-meridian" })
-    });
-    assert.equal(realtimeResponse.status, 503);
-  }
 
   const invalidSettingsResponse = await fetch(`${base}/api/settings`, {
     method: "PUT",

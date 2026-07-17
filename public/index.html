@@ -428,17 +428,6 @@
             <span class="model-chip">GPT-5.6 Terra · grounded</span>
           </header>
           <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
-          <div class="assistant-voice" id="assistant-voice">
-            <div>
-              <span class="voice-status-dot" aria-hidden="true"></span>
-              <p><strong>Live voice</strong><small id="assistant-voice-status">Checking realtime availability...</small></p>
-            </div>
-            <button class="button button-secondary voice-button" id="assistant-voice-button" type="button" aria-pressed="false" disabled>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm-6 9a6 6 0 0 0 12 0M12 18v3M9 21h6"/></svg>
-              <span id="assistant-voice-label">Start voice</span>
-            </button>
-            <audio id="assistant-voice-audio" autoplay hidden></audio>
-          </div>
           <form class="chat-composer" id="assistant-form">
             <label class="sr-only" for="assistant-message">Message tenant assistant</label>
             <textarea id="assistant-message" name="message" rows="2" placeholder="Ask about the building or describe a maintenance issue…" required></textarea>
