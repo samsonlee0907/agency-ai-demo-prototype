@@ -1,3 +1,5 @@
+import { meridianLeasePages, meridianLeaseSourceText } from "./lease-source.js";
+
 export const listings = [
   {
     id: "harbour-house",
@@ -153,27 +155,12 @@ export const leaseDocuments = [
   {
     id: "lease-meridian",
     title: "Meridian House · Office lease",
-    fileName: "Meridian-House-Level-4-Lease.pdf",
-    source: "SharePoint · Legal / Executed leases",
-    pageCount: 48,
+    fileName: "meridian-house-office-lease-demo.pdf",
+    source: "Demo document library · Executed leases",
+    pageCount: meridianLeasePages.length,
+    pdfUrl: "/assets/documents/meridian-house-office-lease-demo.pdf",
     updated: "Executed 12 June 2026",
-    content: `COMMERCIAL LEASE — EXECUTED
-Landlord: Harbour Asset Holdings Pty Ltd (ACN 100 200 300)
-Tenant: Northstar Advisory Pty Ltd (ACN 400 500 600)
-Premises: Suite 4.02, Level 4, Meridian House, 88 Pitt Street, Sydney NSW 2000
-Term: Five years commencing 1 August 2026 and expiring 31 July 2031.
-Option: One further term of three years. Tenant must exercise between 9 and 12 months before expiry.
-Base rent: AUD 420,000 per annum plus GST, payable monthly in advance.
-Review: 3.5% fixed annual increases on each anniversary; market review at commencement of option term.
-Incentive: Eight months gross rent abatement applied across the first lease year.
-Security: Unconditional bank guarantee equal to six months gross rent, replenished after any draw.
-Outgoings: Tenant pays 12.5% of increases in statutory and operating outgoings over the 2026 base year.
-Permitted use: Corporate advisory and ancillary office use.
-Break clause: None.
-Tenant obligations: Maintain internal finishes and services; comply with building rules; hold public liability insurance of AUD 20 million; make good by removing fitout additions and repairing damage at expiry.
-Landlord obligations: Maintain structure, lifts, common services and base building plant; provide reasonable after-hours access.
-Assignment requires landlord consent, not to be unreasonably withheld where financial standing and use are acceptable.
-Notices: 20 business days to remedy a non-monetary breach; five business days for unpaid rent.`
+    content: meridianLeaseSourceText
   },
   {
     id: "lease-arcade",

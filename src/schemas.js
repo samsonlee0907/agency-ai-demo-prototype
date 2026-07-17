@@ -129,6 +129,9 @@ export const leaseRequestSchema = z.object({
   leaseId: z.string().min(1)
 });
 
+export const LEASE_REVIEW_NOTE_MAX_LENGTH = 900;
+export const LEASE_CLAUSE_SUMMARY_MAX_LENGTH = 600;
+
 export const leaseOutputSchema = z.object({
   documentTitle: z.string().min(3).max(180),
   executiveSummary: z.string().min(20).max(1000),
@@ -141,18 +144,18 @@ export const leaseOutputSchema = z.object({
     commencement: z.string().min(3).max(100),
     expiry: z.string().min(3).max(100),
     initialTerm: z.string().min(2).max(100),
-    options: z.string().min(2).max(300)
+    options: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH)
   }),
   rent: z.object({
-    baseAnnual: z.string().min(2).max(160),
-    payment: z.string().min(2).max(160),
-    review: z.string().min(2).max(300)
+    baseAnnual: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH),
+    payment: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH),
+    review: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH)
   }),
-  incentive: z.string().min(2).max(300),
-  security: z.string().min(2).max(300),
-  outgoings: z.string().min(2).max(400),
-  permittedUse: z.string().min(2).max(300),
-  breakClause: z.string().min(2).max(400),
+  incentive: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH),
+  security: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH),
+  outgoings: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH),
+  permittedUse: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH),
+  breakClause: z.string().min(2).max(LEASE_CLAUSE_SUMMARY_MAX_LENGTH),
   criticalDates: z.array(z.object({
     date: z.string().min(2).max(100),
     event: z.string().min(3).max(240),
@@ -166,7 +169,7 @@ export const leaseOutputSchema = z.object({
     detail: z.string().min(10).max(500),
     clause: z.string().min(2).max(120)
   })).min(1).max(8),
-  reviewNote: z.string().min(10).max(400)
+  reviewNote: z.string().min(10).max(LEASE_REVIEW_NOTE_MAX_LENGTH)
 });
 
 const assistantHistoryItemSchema = z.object({
@@ -416,7 +419,10 @@ export const leaseJsonSchema = {
         commencement: { type: "string" },
         expiry: { type: "string" },
         initialTerm: { type: "string" },
-        options: { type: "string" }
+        options: {
+          type: "string",
+          description: `Lease renewal options and conditions, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.`
+        }
       }
     },
     rent: {
@@ -424,16 +430,25 @@ export const leaseJsonSchema = {
       additionalProperties: false,
       required: ["baseAnnual", "payment", "review"],
       properties: {
-        baseAnnual: { type: "string" },
-        payment: { type: "string" },
-        review: { type: "string" }
+        baseAnnual: {
+          type: "string",
+          description: `Base-rent terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.`
+        },
+        payment: {
+          type: "string",
+          description: `Rent-payment terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.`
+        },
+        review: {
+          type: "string",
+          description: `Rent review terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.`
+        }
       }
     },
-    incentive: { type: "string" },
-    security: { type: "string" },
-    outgoings: { type: "string" },
-    permittedUse: { type: "string" },
-    breakClause: { type: "string" },
+    incentive: { type: "string", description: `Incentive terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.` },
+    security: { type: "string", description: `Security terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.` },
+    outgoings: { type: "string", description: `Outgoings terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.` },
+    permittedUse: { type: "string", description: `Permitted-use terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.` },
+    breakClause: { type: "string", description: `Break-clause terms, at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters.` },
     criticalDates: {
       type: "array",
       minItems: 2,
@@ -467,7 +482,10 @@ export const leaseJsonSchema = {
         }
       }
     },
-    reviewNote: { type: "string" }
+    reviewNote: {
+      type: "string",
+      description: `Concise professional-review warning in one to three sentences, at most ${LEASE_REVIEW_NOTE_MAX_LENGTH} characters.`
+    }
   }
 };
 

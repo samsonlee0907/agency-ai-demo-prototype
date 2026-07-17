@@ -12,6 +12,7 @@
     "start": "node server.js",
     "test": "node --test",
     "lint": "node scripts/lint.mjs",
+    "generate:lease-pdf": "node scripts/generate-lease-pdf.mjs",
     "generate:property-images": "node scripts/generate-property-images.mjs"
   },
   "dependencies": {

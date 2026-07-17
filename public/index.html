@@ -554,6 +554,36 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
+  <dialog class="lease-preview-dialog" id="lease-preview-dialog" aria-labelledby="lease-preview-title">
+    <div class="lease-preview-head">
+      <div>
+        <p class="eyebrow" id="lease-preview-label">Demo source transcript</p>
+        <h2 id="lease-preview-title"></h2>
+        <p id="lease-preview-meta"></p>
+      </div>
+      <button class="dialog-close" id="lease-preview-close" type="button" aria-label="Close source preview">×</button>
+    </div>
+    <div class="lease-preview-notice">
+      <strong id="lease-preview-notice-title">Preview limitation</strong>
+      <span id="lease-preview-notice-text"></span>
+    </div>
+    <div class="lease-preview-source"><span>Source record</span><strong id="lease-preview-source"></strong></div>
+    <div class="lease-preview-pdf" id="lease-preview-pdf" hidden>
+      <iframe id="lease-preview-frame" title="Lease PDF preview"></iframe>
+      <div class="lease-preview-links">
+        <a id="lease-preview-open" target="_blank" rel="noopener">Open PDF in a new tab</a>
+        <a id="lease-preview-download" download>Download PDF</a>
+      </div>
+    </div>
+    <details class="lease-preview-raw" id="lease-preview-raw">
+      <summary>View pre-extracted raw text sent to GPT-5.4</summary>
+      <pre id="lease-preview-content" tabindex="0"></pre>
+    </details>
+    <div class="dialog-actions">
+      <button class="button button-primary" id="lease-preview-done" type="button">Close preview</button>
+    </div>
+  </dialog>
+
   <dialog class="settings-dialog" id="settings-dialog" aria-labelledby="settings-title">
     <form id="settings-form">
       <div class="dialog-heading">

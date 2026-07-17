@@ -11,6 +11,8 @@ import {
   maintenanceOutputSchema,
   marketingJsonSchema,
   marketingOutputSchema,
+  LEASE_CLAUSE_SUMMARY_MAX_LENGTH,
+  LEASE_REVIEW_NOTE_MAX_LENGTH,
   leaseJsonSchema,
   leaseOutputSchema,
   qualificationJsonSchema,
@@ -242,7 +244,7 @@ export function createGptProvider(config) {
     abstractLease(lease) {
       return generateStructured({
         name: "lease_abstraction",
-        instructions: "You are a careful commercial lease abstraction assistant. Extract only terms supported by the supplied document text. Preserve uncertainty and conflicts, identify material deadlines and obligations, and flag the output for professional legal review. Do not infer missing clauses.",
+        instructions: `You are a careful commercial lease abstraction assistant. Extract only terms supported by the supplied pre-extracted document text. Preserve uncertainty and conflicts, identify material deadlines and obligations, and flag the output for professional legal review. Do not infer missing clauses. Keep each clause summary (term.options, all rent fields, incentive, security, outgoings, permittedUse and breakClause) at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters. Keep reviewNote concise: one to three sentences and at most ${LEASE_REVIEW_NOTE_MAX_LENGTH} characters.`,
         input: { lease },
         jsonSchema: leaseJsonSchema,
         outputSchema: leaseOutputSchema

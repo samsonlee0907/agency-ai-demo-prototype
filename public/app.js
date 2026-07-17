@@ -271,15 +271,45 @@ function renderLeaseSelect() {
 function renderLeaseSource() {
   const lease = leaseById($("#lease-document").value);
   if (!lease) return;
+  const hasPdf = Boolean(lease.pdfUrl);
   const excerpt = lease.content.length > 520 ? `${lease.content.slice(0, 520)}…` : lease.content;
   $("#lease-source").innerHTML = `
     <div class="lease-file-head">
-      <span class="file-badge">PDF</span>
-      <div><strong>${escapeHtml(lease.fileName)}</strong><small>${lease.pageCount} pages · ${escapeHtml(lease.updated)}</small></div>
+      <span class="file-badge">${hasPdf ? "PDF" : "DEMO"}</span>
+      <div><strong>${escapeHtml(lease.fileName)}</strong><small>Fictional ${lease.pageCount}-page agreement · ${escapeHtml(lease.updated)}</small></div>
+      <button class="lease-preview-button" type="button" id="preview-lease-source">${hasPdf ? "Preview PDF" : "Preview source"}</button>
     </div>
     <p>${escapeHtml(lease.source)}</p>
+    <div class="lease-source-notice">${hasPdf ? "PDF asset available · matching pre-extracted raw text is sent to GPT-5.4" : "Source text fixture · no binary PDF is stored for this sample"}</div>
     <pre>${escapeHtml(excerpt)}</pre>
   `;
+  $("#preview-lease-source").addEventListener("click", () => openLeasePreview(lease));
+}
+
+function openLeasePreview(lease) {
+  const hasPdf = Boolean(lease.pdfUrl);
+  $("#lease-preview-title").textContent = lease.fileName;
+  $("#lease-preview-meta").textContent = `${lease.title} · ${lease.pageCount}-page fictional agreement · ${lease.updated}`;
+  $("#lease-preview-source").textContent = lease.source;
+  $("#lease-preview-content").textContent = lease.content;
+  $("#lease-preview-label").textContent = hasPdf ? "PDF document preview" : "Demo source transcript";
+  $("#lease-preview-notice-title").textContent = hasPdf ? "Extraction path" : "Preview limitation";
+  $("#lease-preview-notice-text").textContent = hasPdf
+    ? "The embedded PDF is available for inspection. GPT-5.4 receives the matching pre-extracted raw text shown below, not the binary PDF."
+    : "This sample has no stored PDF binary. The complete fictional text supplied to GPT-5.4 is shown below.";
+  const pdfPreview = $("#lease-preview-pdf");
+  const pdfFrame = $("#lease-preview-frame");
+  const pdfLinks = [$("#lease-preview-open"), $("#lease-preview-download")];
+  pdfPreview.hidden = !hasPdf;
+  if (hasPdf) {
+    pdfFrame.src = lease.pdfUrl;
+    for (const link of pdfLinks) link.href = lease.pdfUrl;
+  } else {
+    pdfFrame.removeAttribute("src");
+    for (const link of pdfLinks) link.removeAttribute("href");
+  }
+  $("#lease-preview-raw").open = !hasPdf;
+  $("#lease-preview-dialog").showModal();
 }
 
 function buildingById(id) {
@@ -1161,6 +1191,8 @@ function wireEvents() {
   $("#mai-auth-mode").addEventListener("change", renderMaiAuthMode);
   $("#settings-close").addEventListener("click", closeSettings);
   $("#settings-cancel").addEventListener("click", closeSettings);
+  $("#lease-preview-close").addEventListener("click", () => $("#lease-preview-dialog").close());
+  $("#lease-preview-done").addEventListener("click", () => $("#lease-preview-dialog").close());
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       $("#status-popover").hidden = true;
