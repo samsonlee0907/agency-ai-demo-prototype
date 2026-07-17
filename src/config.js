@@ -46,9 +46,27 @@ export function normalizeMaiEndpoint(value) {
   return `${parsed.origin}${basePath}`.replace(/\/+$/, "");
 }
 
+export function normalizeRealtimeEndpoint(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  const parsed = new URL(raw);
+  assertSecureEndpoint(parsed);
+  if (parsed.hostname.endsWith(".services.ai.azure.com")) {
+    parsed.hostname = parsed.hostname.replace(/\.services\.ai\.azure\.com$/, ".openai.azure.com");
+  } else if (parsed.hostname.endsWith(".cognitiveservices.azure.com")) {
+    parsed.hostname = parsed.hostname.replace(/\.cognitiveservices\.azure\.com$/, ".openai.azure.com");
+  }
+  parsed.pathname = "";
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString().replace(/\/$/, "");
+}
+
 export function getConfig(env = process.env) {
   const gptEndpoint = normalizeAzureOpenAIBaseUrl(env.GPT_ENDPOINT);
   const maiEndpoint = normalizeMaiEndpoint(env.MAI_ENDPOINT);
+  const realtimeEndpoint = normalizeRealtimeEndpoint(env.REALTIME_ENDPOINT);
   const requestedMode = env.MODEL_MODE === "live" ? "live" : "mock";
   const portalCredentialHash = String(env.PORTAL_CREDENTIAL_HASH || "").trim();
   const portalSessionSecret = String(env.PORTAL_SESSION_SECRET || "").trim();
@@ -81,6 +99,11 @@ export function getConfig(env = process.env) {
       apiKey: String(env.MAI_API_KEY || "").trim(),
       model: String(env.MAI_MODEL || "MAI-Image-2.5").trim(),
       authMode: env.MAI_AUTH_MODE === "entra" ? "entra" : "api-key"
+    },
+    realtime: {
+      endpoint: realtimeEndpoint,
+      deployment: String(env.REALTIME_DEPLOYMENT || "gpt-realtime-2.1").trim(),
+      authMode: "entra"
     }
   };
 
@@ -90,6 +113,7 @@ export function getConfig(env = process.env) {
   config.mai.configured = Boolean(
     config.mai.endpoint && (config.mai.authMode === "entra" || config.mai.apiKey)
   );
+  config.realtime.configured = Boolean(config.realtime.endpoint && config.realtime.deployment);
   config.defaultMode = requestedMode === "live" && config.gpt.configured ? "live" : "mock";
   return config;
 }
@@ -109,6 +133,11 @@ export function publicStatus(config) {
       configured: config.mai.configured,
       model: config.mai.model,
       authMode: config.mai.authMode
+    },
+    realtime: {
+      configured: config.realtime.configured,
+      deployment: config.realtime.deployment,
+      authMode: config.realtime.authMode
     }
   };
 }

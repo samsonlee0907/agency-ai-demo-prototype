@@ -10,6 +10,7 @@ import { abstractLease, analyseMaintenance, answerTenant, buildEsgEvidence, crea
 import { esgPortfolio, findMaintenanceAsset, maintenanceAssets } from "./src/operations-data.js";
 import { createGptProvider, ModelResponseError } from "./src/providers/gpt.js";
 import { createMaiImageProvider } from "./src/providers/mai-image.js";
+import { createRealtimeProvider, RealtimeResponseError } from "./src/providers/realtime.js";
 import { createCampaignEditPrompt } from "./src/property-image-prompts.js";
 import {
   createPortalSessionToken,
@@ -27,6 +28,7 @@ import {
   matchRequestSchema,
   maintenanceRequestSchema,
   qualificationRequestSchema,
+  realtimeSessionRequestSchema,
   settingsRequestSchema,
   valuationRequestSchema
 } from "./src/schemas.js";
@@ -38,13 +40,17 @@ const loginPath = path.join(root, "public", "login.html");
 const runtime = {};
 let settingsUpdateQueue = Promise.resolve();
 const loginAttempts = new Map();
+const realtimeSessionAttempts = new Map();
 const loginWindowMs = 15 * 60 * 1000;
 const loginAttemptLimit = 5;
+const realtimeSessionWindowMs = 10 * 60 * 1000;
+const realtimeSessionLimit = 8;
 
 function applyConfig(env = process.env) {
   runtime.config = getConfig(env);
   runtime.gpt = createGptProvider(runtime.config.gpt);
   runtime.mai = createMaiImageProvider(runtime.config.mai);
+  runtime.realtime = createRealtimeProvider(runtime.config.realtime);
 }
 
 function resolveBuilding(id) {
@@ -106,6 +112,30 @@ function loginAttemptState(address, now = Date.now()) {
     return state;
   }
   return existing;
+}
+
+function requireRealtimeSessionAccess(request, _response, next) {
+  if (!runtime.config.portalAuth.enabled) {
+    const error = new Error("Realtime voice requires portal authentication.");
+    error.status = 503;
+    next(error);
+    return;
+  }
+
+  const now = Date.now();
+  const existing = realtimeSessionAttempts.get(request.ip);
+  const state = !existing || now - existing.startedAt >= realtimeSessionWindowMs
+    ? { count: 0, startedAt: now }
+    : existing;
+  if (state.count >= realtimeSessionLimit) {
+    const error = new Error("Too many realtime sessions. Try again in 10 minutes.");
+    error.status = 429;
+    next(error);
+    return;
+  }
+  state.count += 1;
+  realtimeSessionAttempts.set(request.ip, state);
+  next();
 }
 
 app.get("/login.css", (_request, response) => {
@@ -247,6 +277,19 @@ app.post("/api/assistant", async (request, response, next) => {
       ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).respondToTenant(building, message, history)
       : answerTenant(buildingId, message, history);
     response.json({ mode, buildingId, ...output });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/realtime/client-secret", requireRealtimeSessionAccess, async (request, response, next) => {
+  try {
+    const { buildingId } = realtimeSessionRequestSchema.parse(request.body);
+    const building = resolveBuilding(buildingId);
+    const output = await requireLiveProvider(runtime.realtime, runtime.config.realtime.deployment)
+      .createClientSecret(building);
+    response.setHeader("Cache-Control", "no-store");
+    response.json(output);
   } catch (error) {
     next(error);
   }
@@ -418,7 +461,8 @@ app.get("*splat", (_request, response) => {
 
 app.use((error, _request, response, _next) => {
   const validationError = error instanceof ZodError;
-  const status = validationError ? 400 : error.status || (error instanceof ModelResponseError ? 502 : 500);
+  const modelError = error instanceof ModelResponseError || error instanceof RealtimeResponseError;
+  const status = validationError ? 400 : error.status || (modelError ? 502 : 500);
   const message = validationError
     ? `Invalid request: ${error.issues.map((issue) => issue.message).join(", ")}`
     : error.message || "Unexpected server error.";

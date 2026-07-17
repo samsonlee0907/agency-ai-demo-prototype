@@ -7,11 +7,11 @@ A lightweight, client-facing web app demonstrating eight Microsoft Foundry use c
 3. **Lead qualification agent** — extracts intent, prioritises the enquiry and drafts a personal follow-up.
 4. **Valuation assistant (AVM copilot)** — reconciles fictional comparable transactions into an indicative range and valuer-review draft.
 5. **Lease and contract abstraction** — extracts commercial terms, obligations, critical dates and review flags from sample agreements.
-6. **Tenant virtual assistant** — answers grounded building questions, triages maintenance and creates transparent work-order hand-offs in a conversational interface.
+6. **Tenant virtual assistant** — answers grounded building questions, triages maintenance and creates transparent work-order hand-offs through text or low-latency voice.
 7. **Predictive maintenance and energy** — correlates fictional BMS and condition signals into explainable failure risk, energy impact and technician-ready actions.
 8. **ESG and sustainability copilot** — calculates portfolio KPIs, identifies evidence gaps and prepares a management review draft with owned next actions.
 
-The app works immediately with deterministic mock data. Live mode uses GPT-5.6 Terra and MAI-Image-2.5 through server-side providers, so browser code never receives model credentials.
+The app works immediately with deterministic mock data. Live mode uses GPT-5.6 Terra, GPT-realtime-2.1 and MAI-Image-2.5 through server-side providers. Long-lived model credentials never reach the browser.
 
 ## Run locally
 
@@ -47,6 +47,8 @@ You can alternatively copy `.env.example` to `.env` and edit it manually. Mock r
 | `GPT_AUTH_MODE` | `api-key` | `api-key` or `entra` |
 | `GPT_API_KEY` | — | Server-side Azure OpenAI API key |
 | `GPT_DEPLOYMENT` | `gpt-5.6-terra` | Azure deployment name |
+| `REALTIME_ENDPOINT` | — | Azure OpenAI resource endpoint for WebRTC |
+| `REALTIME_DEPLOYMENT` | `gpt-realtime-2.1` | Realtime model deployment name |
 | `MAI_ENDPOINT` | — | Foundry endpoint; may be a separate resource |
 | `MAI_AUTH_MODE` | `api-key` | `api-key` or `entra` |
 | `MAI_API_KEY` | — | Server-side MAI API key |
@@ -69,6 +71,17 @@ client.responses.create({ model: deployment, input: /* ... */ })
 Each workflow requests a strict JSON schema and validates the parsed result with Zod before returning it to the browser.
 
 For resources with key authentication disabled, choose **Microsoft Entra ID** for both providers in the portal. The app uses `DefaultAzureCredential`: GPT requests use `https://ai.azure.com/.default`, while MAI follows the current Microsoft guidance with `https://cognitiveservices.azure.com/.default`. Locally this can use your `az login` session; in Azure it can use managed identity. Assign the active identity the **Foundry User** role on the Foundry resource.
+
+### Managed-identity realtime voice
+
+Tenant voice follows Microsoft's current [Azure OpenAI Realtime WebRTC guidance](https://learn.microsoft.com/azure/foundry/openai/how-to/realtime-audio-webrtc):
+
+1. The authenticated browser requests `POST /api/realtime/client-secret` with a selected building identifier.
+2. The server validates the building, grounds the session in its fictional service guide, and uses `DefaultAzureCredential` to call `POST /openai/v1/realtime/client_secrets`.
+3. The browser receives only the short-lived client secret and negotiates WebRTC directly with `POST /openai/v1/realtime/calls?webrtcfilter=on`.
+4. Microphone, peer connection, media tracks and remote audio are closed when voice stops, the building changes, or the user leaves the assistant.
+
+`REALTIME_ENDPOINT` and `REALTIME_DEPLOYMENT` are server-side settings. Realtime authentication is always Microsoft Entra ID; no realtime API-key setting is supported. The App Service managed identity needs inference access to the Foundry resource. Server VAD supports natural turn-taking and interruption, while the WebRTC event filter prevents session instructions from being returned over the browser data channel. Credential minting is disabled unless portal authentication is configured and is limited to eight sessions per client every 10 minutes.
 
 MAI routing is isolated in `src/providers/mai-image.js`, following the route used by the referenced Microsoft model portal:
 
@@ -102,12 +115,13 @@ src/operations-data.js        fictional asset telemetry and ESG source records
 src/mock-services.js          deterministic workflows and portfolio calculations
 src/providers/gpt.js          GPT Responses API + strict output validation
 src/providers/mai-image.js    MAI generation/edit routes and response parsing
+src/providers/realtime.js     managed-identity realtime session minting
 src/property-image-prompts.js restrained base-generation and edit directions
 src/schemas.js                request and model-output contracts
 scripts/                      syntax checks and reproducible property imagery
 test/                         focused unit and API smoke tests
 ```
 
-`GET /api/status` reports only model readiness and deployment names—never endpoints or secrets. Live provider failures return explicit API errors and are never replaced with mock success.
+`GET /api/status` reports only model readiness and deployment names—never endpoints or secrets. The authenticated realtime session route returns a short-lived browser credential with `Cache-Control: no-store`; no long-lived Azure credential or API key is exposed. Live provider failures return explicit API errors and are never replaced with mock success.
 
 `POST /api/valuation`, `POST /api/lease`, `POST /api/assistant`, `POST /api/maintenance` and `POST /api/esg` use the same server-side GPT-5.6 Terra Responses provider and strict schema validation as the original scenarios. Comparable sales, leases, buildings, telemetry and sustainability records are fictional demo data. Predictive-maintenance readings and ESG metrics are calculated and restored from server evidence after generation, so GPT explains the data without replacing source facts. All advisory, legal, maintenance and sustainability outputs require appropriate professional review.

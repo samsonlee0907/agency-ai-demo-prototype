@@ -9,6 +9,14 @@ const state = {
   esgPortfolio: null,
   assistantHistory: [],
   assistantPending: false,
+  assistantVoice: {
+    peerConnection: null,
+    dataChannel: null,
+    stream: null,
+    requestId: 0,
+    status: "idle",
+    assistantTranscript: ""
+  },
   maintenanceRequestId: 0,
   esgRequestId: 0,
   selectedLeadId: null,
@@ -115,6 +123,7 @@ function renderStatus() {
   $('[data-mode="live"]').disabled = !status.gpt.configured;
   $("#configure-button").hidden = !status.settingsEditable;
   $("#logout-form").hidden = !status.portalAuthEnabled;
+  renderAssistantVoiceAvailability();
   updateMode(status.defaultMode);
 }
 
@@ -208,6 +217,9 @@ async function saveSettings(event) {
 }
 
 function activateDemo(id, updateLocation = true) {
+  if (id !== "assistant" && state.assistantVoice.status !== "idle") {
+    stopAssistantVoice();
+  }
   $$(".demo-tab").forEach((button) => {
     const active = button.dataset.demo === id;
     button.classList.toggle("is-active", active);
@@ -332,6 +344,7 @@ function renderAssistantBuilding() {
     role: "assistant",
     content: `Welcome to ${building.name}. I can answer building questions, explain tenant services and help log a maintenance request. How can I help?`
   }];
+  state.assistantVoice.assistantTranscript = "";
   renderAssistantMessages();
 }
 
@@ -350,7 +363,7 @@ function renderAssistantMessages() {
     const tenantConfirmations = response?.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?")) || [];
     return `
       <article class="chat-message ${message.role === "user" ? "is-user" : "is-assistant"}">
-        <span class="chat-speaker">${message.role === "user" ? "You" : "Aurelia"}</span>
+        <span class="chat-speaker">${message.role === "user" ? `You${message.voice ? " · voice" : ""}` : `Aurelia${message.voice ? " · voice" : ""}`}</span>
         <div class="message-bubble"><p>${escapeHtml(message.content)}</p></div>
         ${response ? `
           <div class="assistant-result">
@@ -374,6 +387,192 @@ function renderAssistantMessages() {
     `;
   }).join("");
   container.scrollTop = container.scrollHeight;
+}
+
+function renderAssistantVoiceAvailability() {
+  const button = $("#assistant-voice-button");
+  if (!button) return;
+  const supported = Boolean(window.RTCPeerConnection && navigator.mediaDevices?.getUserMedia);
+  const configured = Boolean(state.status?.realtime.configured);
+  button.disabled = !supported || !configured;
+  if (!configured) {
+    setAssistantVoiceState("idle", "Realtime voice is not configured on the server.");
+  } else if (!supported) {
+    setAssistantVoiceState("error", "This browser does not support microphone WebRTC.");
+  } else if (state.assistantVoice.status === "idle") {
+    setAssistantVoiceState("idle", `Ready · ${state.status.realtime.deployment} · managed identity`);
+  }
+}
+
+function setAssistantVoiceState(status, message) {
+  state.assistantVoice.status = status;
+  const panel = $("#assistant-voice");
+  const button = $("#assistant-voice-button");
+  if (!panel || !button) return;
+  panel.className = `assistant-voice is-${status}`;
+  $("#assistant-voice-status").textContent = message;
+  const active = !["idle", "error"].includes(status);
+  button.setAttribute("aria-pressed", String(active));
+  $("#assistant-voice-label").textContent = status === "idle"
+    ? "Start voice"
+    : status === "error"
+      ? "Retry voice"
+      : status === "connecting"
+        ? "Cancel"
+        : "End voice";
+}
+
+function releaseAssistantVoice() {
+  const voice = state.assistantVoice;
+  voice.dataChannel?.close();
+  voice.peerConnection?.close();
+  voice.stream?.getTracks().forEach((track) => track.stop());
+  const audio = $("#assistant-voice-audio");
+  if (audio) audio.srcObject = null;
+  voice.dataChannel = null;
+  voice.peerConnection = null;
+  voice.stream = null;
+  voice.assistantTranscript = "";
+  $("#assistant-building").disabled = state.assistantPending;
+}
+
+function failAssistantVoice(message) {
+  state.assistantVoice.requestId += 1;
+  releaseAssistantVoice();
+  setAssistantVoiceState("error", message);
+}
+
+function stopAssistantVoice() {
+  state.assistantVoice.requestId += 1;
+  releaseAssistantVoice();
+  const message = state.status?.realtime.configured
+    ? `Ready · ${state.status.realtime.deployment} · managed identity`
+    : "Realtime voice is not configured on the server.";
+  setAssistantVoiceState("idle", message);
+}
+
+function completeVoiceAssistantTurn(transcript) {
+  const text = String(transcript || state.assistantVoice.assistantTranscript).trim();
+  state.assistantVoice.assistantTranscript = "";
+  if (!text) return;
+  const previous = state.assistantHistory.at(-1);
+  if (previous?.role === "assistant" && previous.voice && previous.content === text) return;
+  state.assistantHistory.push({ role: "assistant", content: text, voice: true });
+  renderAssistantMessages();
+}
+
+function handleAssistantVoiceEvent(event) {
+  const voice = state.assistantVoice;
+  if (event.type === "input_audio_buffer.speech_started") {
+    setAssistantVoiceState("listening", "Listening...");
+  } else if (event.type === "input_audio_buffer.speech_stopped") {
+    setAssistantVoiceState("processing", "Aurelia is thinking...");
+  } else if (event.type === "response.output_audio_transcript.delta" || event.type === "response.output_text.delta") {
+    voice.assistantTranscript += String(event.delta || "");
+  } else if (event.type === "response.output_audio_transcript.done" || event.type === "response.output_text.done") {
+    completeVoiceAssistantTurn(event.transcript || event.text);
+  } else if (event.type === "output_audio_buffer.started") {
+    setAssistantVoiceState("speaking", "Aurelia is speaking. You can interrupt at any time.");
+  } else if (event.type === "output_audio_buffer.stopped") {
+    setAssistantVoiceState("connected", "Connected · speak naturally");
+  } else if (event.type === "error" || event.type === "session.error") {
+    const detail = event.error?.message || "The realtime session reported an error.";
+    failAssistantVoice(detail);
+  }
+}
+
+async function startAssistantVoice() {
+  const voice = state.assistantVoice;
+  const buildingId = $("#assistant-building").value;
+  const requestId = ++voice.requestId;
+  setAssistantVoiceState("connecting", "Requesting microphone access...");
+  $("#assistant-building").disabled = true;
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    if (voice.requestId !== requestId) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    voice.stream = stream;
+    setAssistantVoiceState("connecting", "Creating a secure realtime session...");
+    const session = await api("/api/realtime/client-secret", {
+      method: "POST",
+      body: JSON.stringify({ buildingId })
+    });
+    if (voice.requestId !== requestId) return;
+
+    const peerConnection = new RTCPeerConnection();
+    voice.peerConnection = peerConnection;
+    stream.getTracks().forEach((track) => peerConnection.addTrack(track, stream));
+    peerConnection.ontrack = (event) => {
+      const remoteStream = event.streams?.[0];
+      if (remoteStream) $("#assistant-voice-audio").srcObject = remoteStream;
+    };
+    peerConnection.onconnectionstatechange = () => {
+      if (voice.requestId !== requestId) return;
+      if (peerConnection.connectionState === "connected") {
+        setAssistantVoiceState("connected", "Connected · speak naturally");
+      } else if (["failed", "disconnected"].includes(peerConnection.connectionState)) {
+        failAssistantVoice("The voice connection was interrupted.");
+      }
+    };
+
+    const dataChannel = peerConnection.createDataChannel("oai-events");
+    voice.dataChannel = dataChannel;
+    dataChannel.onopen = () => setAssistantVoiceState("connected", "Connected · speak naturally");
+    dataChannel.onmessage = (message) => {
+      try {
+        handleAssistantVoiceEvent(JSON.parse(message.data));
+      } catch {
+        failAssistantVoice("A realtime event could not be read.");
+      }
+    };
+    dataChannel.onclose = () => {
+      if (voice.requestId === requestId && voice.status !== "idle") {
+        releaseAssistantVoice();
+        setAssistantVoiceState("error", "The voice session ended.");
+      }
+    };
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    const callsUrl = `${String(session.endpoint).replace(/\/+$/, "")}/openai/v1/realtime/calls?webrtcfilter=on`;
+    const response = await fetch(callsUrl, {
+      method: "POST",
+      headers: {
+        Authorization: ["Bearer", session.clientSecret].join(" "),
+        "Content-Type": "application/sdp"
+      },
+      body: offer.sdp
+    });
+    if (!response.ok) throw new Error(`WebRTC negotiation failed (${response.status}).`);
+    await peerConnection.setRemoteDescription({
+      type: "answer",
+      sdp: await response.text()
+    });
+  } catch (error) {
+    if (voice.requestId !== requestId) return;
+    failAssistantVoice(error.message);
+  } finally {
+    if (voice.requestId === requestId) {
+      $("#assistant-building").disabled = state.assistantPending || voice.status !== "idle" && voice.status !== "error";
+    }
+  }
+}
+
+function toggleAssistantVoice() {
+  if (["idle", "error"].includes(state.assistantVoice.status)) {
+    startAssistantVoice();
+  } else {
+    stopAssistantVoice();
+  }
 }
 
 function maintenanceAssetById(id) {
@@ -1167,7 +1366,11 @@ function wireEvents() {
   $("#lease-form").addEventListener("submit", submitLease);
   $("#lease-document").addEventListener("change", renderLeaseSource);
   $("#assistant-form").addEventListener("submit", submitAssistantMessage);
-  $("#assistant-building").addEventListener("change", renderAssistantBuilding);
+  $("#assistant-building").addEventListener("change", () => {
+    stopAssistantVoice();
+    renderAssistantBuilding();
+  });
+  $("#assistant-voice-button").addEventListener("click", toggleAssistantVoice);
   $("#maintenance-form").addEventListener("submit", submitMaintenance);
   $("#maintenance-asset").addEventListener("change", renderMaintenanceAssetProfile);
   $("#maintenance-form").addEventListener("change", () => {
@@ -1215,6 +1418,7 @@ function wireEvents() {
     const id = window.location.hash.slice(1);
     if ($(`.demo-tab[data-demo="${id}"]`)) activateDemo(id, false);
   });
+  window.addEventListener("beforeunload", releaseAssistantVoice);
 }
 
 async function initialize() {

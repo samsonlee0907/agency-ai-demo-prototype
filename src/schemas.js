@@ -16,6 +16,10 @@ export const settingsRequestSchema = z.object({
   mai: providerSettingsSchema
 });
 
+export const realtimeSessionRequestSchema = z.object({
+  buildingId: z.string().trim().min(1).max(80)
+});
+
 export const buyerBriefSchema = z.object({
   location: z.string().trim().min(1).max(80),
   budget: z.coerce.number().int().min(500000).max(20000000),
