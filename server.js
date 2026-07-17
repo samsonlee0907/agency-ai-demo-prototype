@@ -76,7 +76,8 @@ app.use(express.urlencoded({ extended: false, limit: "10kb" }));
 app.use((_request, response, next) => {
   response.setHeader("X-Content-Type-Options", "nosniff");
   response.setHeader("Referrer-Policy", "no-referrer");
-  response.setHeader("X-Frame-Options", "DENY");
+  response.setHeader("X-Frame-Options", "SAMEORIGIN");
+  response.setHeader("Content-Security-Policy", "frame-ancestors 'self'");
   next();
 });
 

@@ -10,6 +10,8 @@ test("serves status, bootstrap data and deterministic matching", async (context)
 
   const statusResponse = await fetch(`${base}/api/status`);
   assert.equal(statusResponse.status, 200);
+  assert.equal(statusResponse.headers.get("x-frame-options"), "SAMEORIGIN");
+  assert.equal(statusResponse.headers.get("content-security-policy"), "frame-ancestors 'self'");
   const status = await statusResponse.json();
   assert.ok(["mock", "live"].includes(status.defaultMode));
   assert.equal("apiKey" in status.gpt, false);
@@ -43,6 +45,11 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.equal(bootstrap.buildingProfiles.length, 3);
   assert.equal(bootstrap.maintenanceAssets.length, 4);
   assert.equal(bootstrap.esgPortfolio.buildings.length, 3);
+
+  const pdfResponse = await fetch(`${base}/assets/documents/meridian-house-office-lease-demo.pdf`, { method: "HEAD" });
+  assert.equal(pdfResponse.status, 200);
+  assert.equal(pdfResponse.headers.get("content-type"), "application/pdf");
+  assert.equal(pdfResponse.headers.get("x-frame-options"), "SAMEORIGIN");
 
   const matchResponse = await fetch(`${base}/api/match`, {
     method: "POST",

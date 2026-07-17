@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const modeSchema = z.enum(["mock", "live"]).default("mock");
+export const ASSISTANT_REPLY_MAX_LENGTH = 1600;
 
 const providerSettingsSchema = z.object({
   endpoint: z.union([z.string().trim().url().max(500), z.literal("")]),
@@ -185,7 +186,7 @@ export const assistantRequestSchema = z.object({
 });
 
 export const assistantOutputSchema = z.object({
-  reply: z.string().min(20).max(1600),
+  reply: z.string().min(20).max(ASSISTANT_REPLY_MAX_LENGTH),
   category: z.enum(["Building information", "Maintenance", "Access & security", "Lease & payments", "Amenity booking", "Emergency"]),
   urgency: z.enum(["Routine", "Priority", "Emergency"]),
   recommendedAction: z.string().min(5).max(500),

@@ -2,7 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { findMaintenanceAsset } from "../src/operations-data.js";
 import { analyseMaintenance, buildEsgEvidence } from "../src/mock-services.js";
-import { groundEsgReport, groundMaintenanceAnalysis, groundValuationComparables, ModelResponseError } from "../src/providers/gpt.js";
+import {
+  ensureEmergencyGuidance,
+  groundEsgReport,
+  groundMaintenanceAnalysis,
+  groundValuationComparables,
+  ModelResponseError
+} from "../src/providers/gpt.js";
+import { ASSISTANT_REPLY_MAX_LENGTH, assistantOutputSchema } from "../src/schemas.js";
 
 const sources = [
   { id: "comp-one", address: "1 Sample Street", area: "Sydney", saleDate: "1 Jul 2026", salePrice: 1000000 },
@@ -79,6 +86,7 @@ test("ESG grounding restores calculated metrics and requires the complete eviden
     framework: "GRESB review draft",
     focus: "Balanced portfolio"
   });
+
   const result = {
     scope: "Fabricated",
     reportingPeriod: "Fabricated",
@@ -97,4 +105,28 @@ test("ESG grounding restores calculated metrics and requires the complete eviden
     () => groundEsgReport({ ...result, metrics: result.metrics.slice(1) }, evidence),
     ModelResponseError
   );
+});
+
+test("emergency assistant responses always include safe 000 guidance", () => {
+  const response = {
+    reply: "Do not touch the outlet. Move away from the affected area and contact building security.",
+    category: "Emergency",
+    urgency: "Emergency",
+    recommendedAction: "Keep clear of the affected area.",
+    citations: ["Emergency procedures"],
+    workOrder: { created: true, reference: "WO-1", summary: "Water near outlet", nextUpdate: "Security will respond." },
+    suggestions: ["Move to a safe area"]
+  };
+
+  const guarded = ensureEmergencyGuidance(response);
+  assert.match(guarded.reply, /\b000\b/);
+  assert.equal(assistantOutputSchema.safeParse(guarded).success, true);
+  assert.equal(ensureEmergencyGuidance(guarded), guarded);
+
+  const maximumReply = ensureEmergencyGuidance({
+    ...response,
+    reply: "x".repeat(ASSISTANT_REPLY_MAX_LENGTH)
+  });
+  assert.equal(maximumReply.reply.length <= ASSISTANT_REPLY_MAX_LENGTH, true);
+  assert.equal(assistantOutputSchema.safeParse(maximumReply).success, true);
 });

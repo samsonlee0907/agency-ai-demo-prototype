@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 import {
+  ASSISTANT_REPLY_MAX_LENGTH,
   assistantJsonSchema,
   assistantOutputSchema,
   esgJsonSchema,
@@ -26,6 +27,23 @@ export class ModelResponseError extends Error {
     super(message, { cause });
     this.name = "ModelResponseError";
   }
+}
+
+const emergencyGuidance = "If there is immediate danger, fire, injury or an electrical hazard, call 000 now and keep clear of the area.";
+
+export function ensureEmergencyGuidance(result) {
+  if (result.urgency !== "Emergency" || /\b000\b/.test(result.reply)) {
+    return result;
+  }
+
+  const availableLength = ASSISTANT_REPLY_MAX_LENGTH - emergencyGuidance.length - 1;
+  const originalReply = result.reply.length <= availableLength
+    ? result.reply
+    : `${result.reply.slice(0, availableLength - 3).trimEnd()}...`;
+  return {
+    ...result,
+    reply: `${emergencyGuidance} ${originalReply}`
+  };
 }
 
 function parseJsonOutput(text, schema) {
@@ -253,15 +271,12 @@ export function createGptProvider(config) {
     async respondToTenant(building, message, history) {
       const result = await generateStructured({
         name: "tenant_assistant_response",
-        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely, never invent access, lease or account facts, and direct emergencies to local emergency services before building security. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details.",
+        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details.",
         input: { building, message, history },
         jsonSchema: assistantJsonSchema,
         outputSchema: assistantOutputSchema
       });
-      if (result.urgency === "Emergency" && !/\b000\b/.test(result.reply)) {
-        throw new ModelResponseError("GPT emergency guidance did not direct the tenant to emergency services.");
-      }
-      return result;
+      return ensureEmergencyGuidance(result);
     },
     async analyseMaintenance(asset, horizon, baseline) {
       const result = await generateStructured({
