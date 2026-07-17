@@ -75,7 +75,7 @@ test("tenant assistant triages maintenance and creates a grounded work order", (
   assert.match(result.recommendedAction, /electrics/i);
 });
 
-test("tenant assistant suggestions are ready-to-send tenant questions", () => {
+test("tenant assistant suggestions are ready-to-send tenant confirmations", () => {
   const prompts = [
     "I can smell gas",
     "There is a water leak",
@@ -85,7 +85,7 @@ test("tenant assistant suggestions are ready-to-send tenant questions", () => {
     "Tell me about the building"
   ];
   const suggestions = prompts.flatMap((prompt) => answerTenant("building-meridian", prompt).suggestions);
-  assert.ok(suggestions.every((suggestion) => suggestion.endsWith("?")));
+  assert.ok(suggestions.every((suggestion) => !suggestion.endsWith("?")));
 });
 
 test("tenant assistant citations come from the selected building context", () => {

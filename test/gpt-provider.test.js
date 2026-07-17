@@ -7,7 +7,8 @@ import {
   groundEsgReport,
   groundMaintenanceAnalysis,
   groundValuationComparables,
-  ModelResponseError
+  ModelResponseError,
+  normalizeAssistantFollowUps
 } from "../src/providers/gpt.js";
 import { ASSISTANT_REPLY_MAX_LENGTH, assistantOutputSchema } from "../src/schemas.js";
 
@@ -115,7 +116,7 @@ test("emergency assistant responses always include safe 000 guidance", () => {
     recommendedAction: "Keep clear of the affected area.",
     citations: ["Emergency procedures"],
     workOrder: { created: true, reference: "WO-1", summary: "Water near outlet", nextUpdate: "Security will respond." },
-    suggestions: ["Move to a safe area"]
+    suggestions: ["I am in a safe area."]
   };
 
   const guarded = ensureEmergencyGuidance(response);
@@ -129,4 +130,19 @@ test("emergency assistant responses always include safe 000 guidance", () => {
   });
   assert.equal(maximumReply.reply.length <= ASSISTANT_REPLY_MAX_LENGTH, true);
   assert.equal(assistantOutputSchema.safeParse(maximumReply).success, true);
+});
+
+test("assistant qualification questions stay with Aurelia", () => {
+  const result = normalizeAssistantFollowUps({
+    reply: "I have created an urgent work order.",
+    suggestions: [
+      "Has building security been contacted?",
+      "Building security has been contacted.",
+      "Which level is affected?"
+    ]
+  });
+
+  assert.match(result.reply, /Has building security been contacted\?/);
+  assert.match(result.reply, /Which level is affected\?/);
+  assert.deepEqual(result.suggestions, ["Building security has been contacted."]);
 });

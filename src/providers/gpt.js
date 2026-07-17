@@ -46,6 +46,25 @@ export function ensureEmergencyGuidance(result) {
   };
 }
 
+export function normalizeAssistantFollowUps(result) {
+  const questions = result.suggestions.filter((suggestion) => suggestion.trim().endsWith("?"));
+  if (!questions.length) {
+    return result;
+  }
+
+  let reply = result.reply;
+  for (const question of questions) {
+    if (!reply.includes(question) && reply.length + question.length + 1 <= ASSISTANT_REPLY_MAX_LENGTH) {
+      reply += ` ${question}`;
+    }
+  }
+  return {
+    ...result,
+    reply,
+    suggestions: result.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?"))
+  };
+}
+
 function parseJsonOutput(text, schema) {
   if (!text || typeof text !== "string") {
     throw new ModelResponseError("GPT returned an empty response.");
@@ -271,12 +290,12 @@ export function createGptProvider(config) {
     async respondToTenant(building, message, history) {
       const result = await generateStructured({
         name: "tenant_assistant_response",
-        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. Every suggestion must be a ready-to-send follow-up question in the tenant's voice, such as 'How do I contact building security?'; never write a command or instruction for the assistant, facilities team or support staff.",
+        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Ask any qualification or follow-up question directly in reply as Aurelia. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. suggestions are optional ready-to-send tenant confirmations or answer statements, such as 'Building security has been contacted.'; never put a question, an Aurelia prompt, or an instruction for support staff in suggestions, and never invent a tenant fact.",
         input: { building, message, history },
         jsonSchema: assistantJsonSchema,
         outputSchema: assistantOutputSchema
       });
-      return ensureEmergencyGuidance(result);
+      return ensureEmergencyGuidance(normalizeAssistantFollowUps(result));
     },
     async analyseMaintenance(asset, horizon, baseline) {
       const result = await generateStructured({

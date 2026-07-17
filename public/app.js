@@ -346,6 +346,8 @@ function renderAssistantMessages() {
   const container = $("#chat-messages");
   container.innerHTML = state.assistantHistory.map((message) => {
     const response = message.response;
+    const followUpQuestions = response?.suggestions.filter((suggestion) => suggestion.trim().endsWith("?")) || [];
+    const tenantConfirmations = response?.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?")) || [];
     return `
       <article class="chat-message ${message.role === "user" ? "is-user" : "is-assistant"}">
         <span class="chat-speaker">${message.role === "user" ? "You" : "Aurelia"}</span>
@@ -364,7 +366,8 @@ function renderAssistantMessages() {
             ` : ""}
             <p class="assistant-action"><strong>Next step</strong>${escapeHtml(response.recommendedAction)}</p>
             <div class="assistant-citations"><span>Sources</span>${response.citations.map((citation) => `<i>${escapeHtml(citation)}</i>`).join("")}</div>
-            <div class="assistant-followups"><span>Suggested tenant messages · select to review</span>${response.suggestions.map((suggestion) => `<button type="button" data-assistant-prompt="${escapeHtml(suggestion)}"${state.assistantPending ? " disabled" : ""}>${escapeHtml(suggestion)}</button>`).join("")}</div>
+            ${followUpQuestions.length ? `<div class="assistant-questions"><span>Aurelia asks</span>${followUpQuestions.map((question) => `<p>${escapeHtml(question)}</p>`).join("")}</div>` : ""}
+            ${tenantConfirmations.length ? `<div class="assistant-followups"><span>Suggested tenant confirmations · select to review</span>${tenantConfirmations.map((suggestion) => `<button type="button" data-assistant-prompt="${escapeHtml(suggestion)}"${state.assistantPending ? " disabled" : ""}>${escapeHtml(suggestion)}</button>`).join("")}</div>` : ""}
           </div>
         ` : ""}
       </article>

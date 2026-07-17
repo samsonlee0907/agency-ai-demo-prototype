@@ -198,8 +198,8 @@ export const assistantOutputSchema = z.object({
     nextUpdate: z.string().max(200)
   }),
   suggestions: z.array(
-    z.string().min(2).max(160).describe("A ready-to-send follow-up question written in the tenant's voice.")
-  ).min(1).max(3)
+    z.string().min(2).max(160).describe("A ready-to-send tenant confirmation or answer statement, never a question.")
+  ).max(3)
 });
 
 export const maintenanceRequestSchema = z.object({
@@ -517,9 +517,9 @@ export const assistantJsonSchema = {
       type: "array",
       items: {
         type: "string",
-        description: "A ready-to-send follow-up question written in the tenant's voice, never an instruction for support staff."
+        description: "A ready-to-send tenant confirmation or answer statement, never a question or an instruction for support staff."
       },
-      minItems: 1,
+      minItems: 0,
       maxItems: 3
     }
   }
