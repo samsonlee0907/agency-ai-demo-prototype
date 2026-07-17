@@ -364,7 +364,7 @@ function renderAssistantMessages() {
             ` : ""}
             <p class="assistant-action"><strong>Next step</strong>${escapeHtml(response.recommendedAction)}</p>
             <div class="assistant-citations"><span>Sources</span>${response.citations.map((citation) => `<i>${escapeHtml(citation)}</i>`).join("")}</div>
-            <div class="assistant-followups">${response.suggestions.map((suggestion) => `<button type="button" data-assistant-prompt="${escapeHtml(suggestion)}"${state.assistantPending ? " disabled" : ""}>${escapeHtml(suggestion)}</button>`).join("")}</div>
+            <div class="assistant-followups"><span>Suggested tenant messages · select to review</span>${response.suggestions.map((suggestion) => `<button type="button" data-assistant-prompt="${escapeHtml(suggestion)}"${state.assistantPending ? " disabled" : ""}>${escapeHtml(suggestion)}</button>`).join("")}</div>
           </div>
         ` : ""}
       </article>
@@ -1175,8 +1175,10 @@ function wireEvents() {
   $(".assistant-workspace").addEventListener("click", (event) => {
     const prompt = event.target.closest("[data-assistant-prompt]")?.dataset.assistantPrompt;
     if (!prompt || state.assistantPending) return;
-    $("#assistant-message").value = prompt;
-    $("#assistant-form").requestSubmit();
+    const composer = $("#assistant-message");
+    composer.value = prompt;
+    composer.focus();
+    composer.setSelectionRange(prompt.length, prompt.length);
   });
   $("#lead-list").addEventListener("click", (event) => {
     const button = event.target.closest("[data-lead-id]");

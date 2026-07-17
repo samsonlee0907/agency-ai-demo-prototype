@@ -391,7 +391,7 @@ export function answerTenant(buildingId, message) {
       recommendedAction: "Call 000, move to safety, then notify building security.",
       citations: [emergencyGuide.title, building.emergencyContact],
       workOrder: { created: false, reference: "", summary: "Emergency escalation only", nextUpdate: "Not applicable" },
-      suggestions: ["Show me the evacuation guidance", "Contact building security"]
+      suggestions: ["What evacuation guidance should I follow?", "How do I contact building security?"]
     };
   }
 
@@ -649,7 +649,7 @@ function answerTenantNonEmergency(building, normalized) {
       recommendedAction: `Keep clear of affected electrics and call ${building.emergencyContact} if the leak is worsening.`,
       citations: [responseGuide.title, building.emergencyContact],
       workOrder: { created: true, reference: "FM-260716-104", summary: "Priority water leak investigation", nextUpdate },
-      suggestions: ["Add a photo to the work order", "Where is the nearest safe exit?"]
+      suggestions: ["How can I add a photo to my work order?", "Where is the nearest safe exit?"]
     };
   }
 
@@ -665,7 +665,7 @@ function answerTenantNonEmergency(building, normalized) {
       recommendedAction: "Keep the local thermostat unchanged while facilities checks the zone.",
       citations: [hvacGuide.title, building.emergencyContact],
       workOrder: { created: true, reference: "FM-260716-105", summary: "Inspect HVAC comfort issue", nextUpdate: "Facilities will confirm attendance timing" },
-      suggestions: ["What are the HVAC hours?", "Request after-hours air conditioning"]
+      suggestions: ["What are the HVAC hours?", "How do I request after-hours air conditioning?"]
     };
   }
 
@@ -678,7 +678,7 @@ function answerTenantNonEmergency(building, normalized) {
       recommendedAction: "Report a lost credential promptly so the building team can secure access.",
       citations: [accessGuide.title, building.emergencyContact],
       workOrder: { created: false, reference: "", summary: "No work order required", nextUpdate: "Not applicable" },
-      suggestions: ["What are concierge hours?", "How do I arrange visitor access?"]
+      suggestions: ["What are the concierge hours?", "How do I arrange visitor access?"]
     };
   }
 
@@ -690,7 +690,7 @@ function answerTenantNonEmergency(building, normalized) {
       recommendedAction: "Send the enquiry to the authorised property-management contact.",
       citations: [`${building.name} service hours`, building.serviceHours],
       workOrder: { created: false, reference: "", summary: "Commercial enquiry routing", nextUpdate: "Property team response within one business day" },
-      suggestions: ["Find my property manager", "Ask about building outgoings"]
+      suggestions: ["How do I contact my property manager?", "Who can answer my question about building outgoings?"]
     };
   }
 
@@ -702,6 +702,6 @@ function answerTenantNonEmergency(building, normalized) {
     recommendedAction: "Choose a suggested question or describe the maintenance issue in more detail.",
     citations: [firstArticle.title, building.serviceHours],
     workOrder: { created: false, reference: "", summary: "No work order required", nextUpdate: "Not applicable" },
-    suggestions: ["What are the access hours?", "Report an air-conditioning issue", "Where are the building amenities?"]
+    suggestions: ["What are the access hours?", "How do I report an air-conditioning issue?", "Where are the building amenities?"]
   };
 }

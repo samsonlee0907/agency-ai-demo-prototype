@@ -197,7 +197,9 @@ export const assistantOutputSchema = z.object({
     summary: z.string().max(300),
     nextUpdate: z.string().max(200)
   }),
-  suggestions: z.array(z.string().min(2).max(160)).min(1).max(3)
+  suggestions: z.array(
+    z.string().min(2).max(160).describe("A ready-to-send follow-up question written in the tenant's voice.")
+  ).min(1).max(3)
 });
 
 export const maintenanceRequestSchema = z.object({
@@ -511,7 +513,15 @@ export const assistantJsonSchema = {
         nextUpdate: { type: "string" }
       }
     },
-    suggestions: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 3 }
+    suggestions: {
+      type: "array",
+      items: {
+        type: "string",
+        description: "A ready-to-send follow-up question written in the tenant's voice, never an instruction for support staff."
+      },
+      minItems: 1,
+      maxItems: 3
+    }
   }
 };
 

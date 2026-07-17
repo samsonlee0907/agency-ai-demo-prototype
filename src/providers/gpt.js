@@ -271,7 +271,7 @@ export function createGptProvider(config) {
     async respondToTenant(building, message, history) {
       const result = await generateStructured({
         name: "tenant_assistant_response",
-        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details.",
+        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. Every suggestion must be a ready-to-send follow-up question in the tenant's voice, such as 'How do I contact building security?'; never write a command or instruction for the assistant, facilities team or support staff.",
         input: { building, message, history },
         jsonSchema: assistantJsonSchema,
         outputSchema: assistantOutputSchema
