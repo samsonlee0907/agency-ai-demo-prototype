@@ -13,6 +13,17 @@ A lightweight, client-facing web app demonstrating eight Microsoft Foundry use c
 
 The app works immediately with deterministic mock data. Live mode uses GPT-5.6 Terra and MAI-Image-2.5 through server-side providers, so browser code never receives model credentials.
 
+Detailed technical flows, API payloads, data schemas, model inputs, and grounding controls are documented in [`docs/scenarios/`](docs/scenarios/):
+
+1. [Intelligent property matching](docs/scenarios/01-property-matching.md)
+2. [Marketing content and image studio](docs/scenarios/02-marketing-content-studio.md)
+3. [Lead qualification](docs/scenarios/03-lead-qualification.md)
+4. [Valuation assistant](docs/scenarios/04-valuation-assistant.md)
+5. [Lease abstraction](docs/scenarios/05-lease-abstraction.md)
+6. [Tenant virtual assistant](docs/scenarios/06-tenant-virtual-assistant.md)
+7. [Predictive maintenance and energy](docs/scenarios/07-predictive-maintenance-energy.md)
+8. [ESG and sustainability copilot](docs/scenarios/08-esg-sustainability-copilot.md)
+
 ## Run locally
 
 Requires Node.js 20 or newer.
