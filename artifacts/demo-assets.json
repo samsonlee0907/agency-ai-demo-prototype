@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {
+      "path": "public/assets/documents/meridian-house-office-lease-demo.pdf",
+      "bytes": 40019,
+      "sha256": "889a72f6573c98a65fad4a4d91b19e744539585b27630c30b8095f1c1157a545",
+      "generator": "scripts/generate-lease-pdf.mjs",
+      "source": "src/lease-source.js"
+    },
+    {
+      "path": "public/assets/properties/atelier-residence.png",
+      "bytes": 2227458,
+      "sha256": "69572d398ee74c6e372dc776c685b128d79dd9eabac74a7f249f84d91a9495e6",
+      "generator": "scripts/generate-property-images.mjs",
+      "source": "src/property-image-prompts.js"
+    },
+    {
+      "path": "public/assets/properties/coastline-pavilion.png",
+      "bytes": 1897591,
+      "sha256": "8881196d7e04e5b333ba161609a80bbbb2b8f9e4a9144f433c4de81e95c44fef",
+      "generator": "scripts/generate-property-images.mjs",
+      "source": "src/property-image-prompts.js"
+    },
+    {
+      "path": "public/assets/properties/gardenia.png",
+      "bytes": 1995400,
+      "sha256": "d1d6140845bf6f1042b4af3bab2a1d506bda0357363b70ee01dadcae2afff397",
+      "generator": "scripts/generate-property-images.mjs",
+      "source": "src/property-image-prompts.js"
+    },
+    {
+      "path": "public/assets/properties/harbour-house.png",
+      "bytes": 1671362,
+      "sha256": "8c6be41b79588337c114593d77f55c479d5480a348e650edec38fad55b8baef4",
+      "generator": "scripts/generate-property-images.mjs",
+      "source": "src/property-image-prompts.js"
+    },
+    {
+      "path": "public/assets/properties/palm-court.png",
+      "bytes": 2086215,
+      "sha256": "be6b4ee17adf11b51e176db5c3017e5311a46a85164bdfa93b63792ac7e0e754",
+      "generator": "scripts/generate-property-images.mjs",
+      "source": "src/property-image-prompts.js"
+    },
+    {
+      "path": "public/assets/properties/skyline-penthouse.png",
+      "bytes": 1391671,
+      "sha256": "7a536d61de2993a4120803818b0630e2bf8f9f9660cc102806f77da653bd16f4",
+      "generator": "scripts/generate-property-images.mjs",
+      "source": "src/property-image-prompts.js"
+    }
+  ]
+}
