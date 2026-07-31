@@ -24,6 +24,8 @@ Detailed technical flows, API payloads, data schemas, model inputs, and groundin
 7. [Predictive maintenance and energy](docs/scenarios/07-predictive-maintenance-energy.md)
 8. [ESG and sustainability copilot](docs/scenarios/08-esg-sustainability-copilot.md)
 
+For a complete deployment of a new independent Azure environment, see [Reproduce the demo on Azure](docs/deployment.md). The repository includes Bicep, a guarded provisioning/deployment script, a reproducible ZIP builder, and an integrity manifest for all committed image and PDF artifacts.
+
 ## Run locally
 
 Requires Node.js 20 or newer.
@@ -41,6 +43,7 @@ Useful scripts:
 npm run dev    # restart on source changes
 npm test       # focused Node test suite
 npm run lint   # syntax-check project JavaScript
+npm run verify:assets # verify committed image/PDF hashes
 npm run generate:property-images # regenerate authentic listing photography with MAI
 ```
 
@@ -79,7 +82,7 @@ client.responses.create({ model: deployment, input: /* ... */ })
 
 Each workflow requests a strict JSON schema and validates the parsed result with Zod before returning it to the browser.
 
-For resources with key authentication disabled, choose **Microsoft Entra ID** for both providers in the portal. The app uses `DefaultAzureCredential`: GPT requests use `https://ai.azure.com/.default`, while MAI follows the current Microsoft guidance with `https://cognitiveservices.azure.com/.default`. Locally this can use your `az login` session; in Azure it can use managed identity. Assign the active identity the **Foundry User** role on the Foundry resource.
+For resources with key authentication disabled, choose **Microsoft Entra ID** for both providers in the portal. The app uses `DefaultAzureCredential`: GPT requests use `https://ai.azure.com/.default`, while MAI follows the current Microsoft guidance with `https://cognitiveservices.azure.com/.default`. Locally this can use your `az login` session; in Azure it can use managed identity. The reproducible Azure template assigns the App Service identity the tested **Cognitive Services User** role on only its Foundry resource.
 
 MAI routing is isolated in `src/providers/mai-image.js`, following the route used by the referenced Microsoft model portal:
 
@@ -116,6 +119,9 @@ src/providers/mai-image.js    MAI generation/edit routes and response parsing
 src/property-image-prompts.js restrained base-generation and edit directions
 src/schemas.js                request and model-output contracts
 scripts/                      syntax checks and reproducible property imagery
+infra/                        subscription-scoped Bicep for an isolated Azure copy
+artifacts/                    committed asset integrity manifest
+docs/scenarios/               detailed scenario data-flow and schema guides
 test/                         focused unit and API smoke tests
 ```
 
