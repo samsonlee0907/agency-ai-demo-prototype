@@ -628,6 +628,15 @@ select:focus, textarea:focus, input:focus, button:focus-visible { border-color: 
 .work-order-card p, .work-order-card small { grid-column: 1 / -1; }
 .work-order-card p { margin: 7px 0 2px; color: var(--navy-soft); font-size: 9px; }
 .work-order-card small { color: var(--ink-muted); font-size: 8px; }
+.assistant-floorplan-card { margin: 12px 0 0; border: 1px solid var(--line); background: var(--ivory); }
+.assistant-floorplan-card > a { display: block; background: white; }
+.assistant-floorplan-card img { display: block; width: 100%; height: auto; max-height: 330px; object-fit: contain; }
+.assistant-floorplan-card figcaption { display: grid; gap: 4px; padding: 12px 13px; }
+.assistant-floorplan-card figcaption > span { color: var(--gold); font-size: 7px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.assistant-floorplan-card figcaption > strong { color: var(--navy); font-family: var(--serif); font-size: 14px; font-weight: 500; }
+.assistant-floorplan-card figcaption p { margin: 0; color: var(--ink-muted); font-size: 8px; line-height: 1.5; }
+.assistant-floorplan-card figcaption div { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+.assistant-floorplan-card figcaption a { color: var(--navy-soft); font-size: 8px; font-weight: 800; text-decoration-color: var(--gold); text-underline-offset: 3px; }
 .assistant-action { display: grid; gap: 3px; margin: 12px 0; color: var(--ink-muted); font-size: 9px; line-height: 1.5; }
 .assistant-action strong { color: var(--navy); font-size: 8px; text-transform: uppercase; }
 .assistant-citations { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }

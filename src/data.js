@@ -1,4 +1,5 @@
 import { meridianLeasePages, meridianLeaseSourceText } from "./lease-source.js";
+import { floorplanAssets } from "./floorplan-assets.js";
 
 export const listings = [
   {
@@ -221,11 +222,13 @@ export const buildingProfiles = [
     type: "Premium office",
     serviceHours: "Concierge 7am–7pm weekdays · Security 24/7",
     emergencyContact: "Building security · 02 9000 0188",
+    floorplans: [floorplanAssets[0]],
     knowledge: [
       { title: "Building access guide", content: "Tenant passes provide 24/7 lobby and lift access. Lost passes should be reported to concierge; temporary passes require photo identification and tenant-authorised approval." },
       { title: "HVAC operating guide", content: "Base-building air conditioning runs 8am–6pm weekdays. After-hours service can be requested before 3pm and is charged to the tenant in 30-minute increments." },
       { title: "End-of-trip facilities", content: "Level B1 includes bicycle racks, showers and lockers. Day lockers release automatically at midnight; permanent lockers are allocated through the tenant facilities contact." },
-      { title: "Maintenance response standard", content: "Safety and active-water incidents are dispatched immediately. Comfort issues receive an acknowledgement within 30 minutes and attendance within four business hours." }
+      { title: "Maintenance response standard", content: "Safety and active-water incidents are dispatched immediately. Comfort issues receive an acknowledgement within 30 minutes and attendance within four business hours." },
+      { title: "Meridian House Level 12 floor plan", content: "The demonstration plan shows three office areas, a central stair and storage core, toilets to the west, and reception, restaurant, kitchen and amenity areas to the east. It does not label lifts, accessible routes or emergency exits. Follow posted signage and building warden directions rather than this static plan in an emergency." }
     ]
   },
   {
@@ -235,6 +238,7 @@ export const buildingProfiles = [
     type: "Retail precinct",
     serviceHours: "Centre management 8am–6pm daily · Security 24/7",
     emergencyContact: "Centre security · 02 9000 0266",
+    floorplans: [],
     knowledge: [
       { title: "Retail access and deliveries", content: "Service-lane deliveries are permitted 6am–9am. Couriers arriving later must use the Oxford Street entrance and may not obstruct customer circulation." },
       { title: "Waste and recycling", content: "Cardboard must be flattened in the blue compactor. Food and general waste use the secured loading-dock bins accessible with a tenant pass." },
@@ -248,6 +252,7 @@ export const buildingProfiles = [
     type: "Industrial estate",
     serviceHours: "Facilities desk 7am–5pm weekdays · Security patrol 24/7",
     emergencyContact: "Estate security · 02 9000 0344",
+    floorplans: [],
     knowledge: [
       { title: "Dock and vehicle access", content: "Heavy-vehicle arrivals use Gate 2 and must book a dock window. The 10 km/h estate speed limit applies at all times." },
       { title: "Maintenance responsibilities", content: "The facilities team maintains structure and shared estate services. Tenants maintain dock equipment, warehouse lighting and equipment dedicated to their premises." },

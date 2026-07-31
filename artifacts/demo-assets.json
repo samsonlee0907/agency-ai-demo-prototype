@@ -9,6 +9,13 @@
       "source": "src/lease-source.js"
     },
     {
+      "path": "public/assets/floorplans/meridian-house-level-12-floorplan.jpeg",
+      "bytes": 543243,
+      "sha256": "51042653143912e4974341c842eaf00f4ad0dd91d015f870d58533fba65e472f",
+      "generator": "Preserved source JPEG (no transformation)",
+      "source": "User-provided neutral floorplan assigned to fictional Meridian House Level 12"
+    },
+    {
       "path": "public/assets/properties/atelier-residence.png",
       "bytes": 2227458,
       "sha256": "69572d398ee74c6e372dc776c685b128d79dd9eabac74a7f249f84d91a9495e6",

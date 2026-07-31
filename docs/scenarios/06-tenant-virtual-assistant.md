@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This scenario answers tenant questions from a selected building's fictional knowledge articles, handles multi-turn context, triages facilities issues, and returns a transparent work-order hand-off. It does not connect to a real help desk, lease system, or facilities platform.
+This scenario answers tenant questions from a selected building's fictional knowledge articles, handles multi-turn context, interprets an approved Meridian House Level 12 floorplan when relevant, triages facilities issues, and returns a transparent work-order hand-off. It does not connect to a real help desk, lease system, or facilities platform.
 
 ## Components
 
@@ -12,6 +12,7 @@ This scenario answers tenant questions from a selected building's fictional know
 | API route | `POST /api/assistant` in `server.js` |
 | Contracts | `assistantRequestSchema`, `assistantOutputSchema`, and `assistantJsonSchema` in `src/schemas.js` |
 | Building knowledge | `buildingProfiles` in `src/data.js` |
+| Approved floorplan registry and loader | `src/floorplan-assets.js` |
 | Repetition filtering | `src/assistant-conversation.js` |
 | Mock triage | `answerTenant()` in `src/mock-services.js` |
 | Live response and safety normalization | `respondToTenant()`, `normalizeAssistantFollowUps()`, and `ensureEmergencyGuidance()` in `src/providers/gpt.js` |
@@ -24,6 +25,7 @@ sequenceDiagram
     participant B as Browser
     participant A as Express API
     participant D as Building knowledge
+    participant F as Approved floorplan registry
     participant G as Mock service or GPT-5.6 Terra
 
     U->>B: Enter message or select a tenant reply
@@ -31,9 +33,16 @@ sequenceDiagram
     B->>A: POST /api/assistant
     A->>A: Validate message and history
     A->>D: Resolve selected building
-    A->>G: Building, current message, and history
+    A->>F: Check server-side floorplan relevance
+    alt Live and relevant Meridian question
+        F-->>A: Approved metadata and JPEG bytes
+        A->>G: Building, message, history, input_image
+    else Mock or unrelated question
+        A->>G: Building, message, and history only
+    end
     G-->>A: Structured reply
     A->>A: Validate output
+    A->>F: Restore authoritative attachment metadata
     A->>A: Move model questions into reply
     A->>A: Remove repeated suggestions
     A->>A: Enforce 000 emergency guidance
@@ -52,14 +61,26 @@ type BuildingProfile = {
   type: string;
   serviceHours: string;
   emergencyContact: string;
+  floorplans: FloorplanAsset[];
   knowledge: Array<{
     title: string;
     content: string;
   }>;
 };
+
+type FloorplanAsset = {
+  id: string;
+  buildingId: string;
+  floor: string;
+  title: string;
+  imageUrl: string;
+  mimeType: "image/jpeg";
+  alt: string;
+  description: string;
+};
 ```
 
-The three fictional profiles cover Meridian House, The Arcade, and Southbank Exchange. Their articles cover access, deliveries, HVAC, amenities, maintenance response, waste, tenant responsibilities, and emergency isolation.
+The three fictional profiles cover Meridian House, The Arcade, and Southbank Exchange. Their articles cover access, deliveries, HVAC, amenities, maintenance response, waste, tenant responsibilities, and emergency isolation. Only Meridian House has an approved floorplan: the neutral demonstration JPEG at `public/assets/floorplans/meridian-house-level-12-floorplan.jpeg`.
 
 ## HTTP request
 
@@ -130,7 +151,21 @@ type AssistantModelInput = {
 };
 ```
 
-Terra receives only the selected building profile, current message, and supplied recent history. It is instructed to:
+For unrelated questions, Terra receives only the selected building profile, current message, and supplied recent history. The server removes floorplans from the model-facing building object for those calls.
+
+For a relevant Meridian House question, the server resolves the asset from its fixed registry, reads the approved file, and appends this Responses API content item after the JSON text input:
+
+```json
+{
+  "type": "input_image",
+  "image_url": "data:image/jpeg;base64,<server-created image bytes>",
+  "detail": "original"
+}
+```
+
+The browser never supplies an image URL, asset ID, file path, or image bytes. GPT-5.6 Terra receives the image only when the current message mentions a floorplan, layout, navigation, or a feature represented on the plan. Image input uses `detail: "original"` because floorplans contain dense labels and spatial relationships.
+
+Terra is instructed to:
 
 - answer only from building knowledge and conversation;
 - avoid inventing access, account, or lease facts;
@@ -139,6 +174,9 @@ Terra receives only the selected building profile, current message, and supplied
 - provide only ready-to-send tenant statements in `suggestions`;
 - create a work order only for an actionable facilities fault;
 - cite supplied articles or contact details;
+- use a floorplan only when the approved image was supplied;
+- distinguish visible layout interpretation from authoritative building policy;
+- never present a static plan as proof of accessibility, current obstructions, occupancy, or emergency routes;
 - prioritize emergency safety.
 
 ## Response schema
@@ -164,16 +202,26 @@ type AssistantResponse = {
     summary: string;         // up to 300
     nextUpdate: string;      // up to 200
   };
+  floorplan: {
+    included: boolean;
+    assetId: string;         // up to 80
+    title: string;           // up to 160
+    floor: string;           // up to 80
+    imageUrl: string;        // up to 240
+    alt: string;             // up to 300
+    caption: string;         // up to 500
+  };
   suggestions: string[];     // 0-3, each 2-160
 };
 ```
 
 ## Post-generation controls
 
-After Zod validation, the provider applies two behavioral controls:
+After Zod validation, the provider applies three behavioral controls:
 
-1. **Question normalization:** any suggestion ending in `?` is removed from the button list and appended to Aurelia's `reply` when it fits within the 1,600-character limit.
-2. **Emergency guidance:** when `urgency` is `Emergency` and the reply does not contain `000`, the server prepends explicit emergency-services guidance, truncating the original response if necessary.
+1. **Floorplan grounding:** when no image was supplied, any returned floorplan ID is rejected. When an image was supplied, an unknown ID is rejected and the title, floor, URL and alternative text are replaced from the server registry. The server attaches the approved image for the relevant request even if the model leaves the optional caption empty.
+2. **Question normalization:** any suggestion ending in `?` is removed from the button list and appended to Aurelia's `reply` when it fits within the 1,600-character limit.
+3. **Emergency guidance:** when `urgency` is `Emergency` and the reply does not contain `000`, the server prepends explicit emergency-services guidance, truncating the original response if necessary.
 
 `filterSuggestedReplies()` also removes duplicate or near-repeated tenant suggestions based on the conversation.
 
@@ -188,14 +236,18 @@ Mock mode uses keyword routing:
 | Air conditioning, hot, cold, HVAC | Routine comfort work order |
 | Pass, access, visitor, entry | Access guidance |
 | Rent, invoice, lease, payment | Route to authorized property management |
+| Floorplan, layout, navigation, or plan feature | Level 12 layout summary with approved inline image |
 | Other | General building information |
 
-It cites the closest building article and/or the building contact. Work-order references are fictional response fields.
+It cites the closest building article and/or the building contact. Floorplan questions cite the matching Meridian House floorplan article and return the same server-owned attachment metadata as Live mode. Work-order references are fictional response fields.
 
 ## Data and operational boundaries
 
 - The authenticated browser receives all fictional building profiles and articles from bootstrap.
 - User messages and recent history are sent to Terra in Live mode and are not persisted by the server.
+- The approved JPEG bytes are sent to Terra only for server-detected relevant Meridian House questions; image inputs are billed as model tokens.
+- The public image URL is safe to display, but its local filesystem path is never accepted from or returned to the browser.
+- The inline card provides full-size open and download controls. It is a static demonstration plan, not a live occupancy, accessibility, or emergency-navigation system.
 - `workOrder.created: true` does not create anything outside the response JSON.
 - Citations name source articles but do not provide retrieval-time document links.
 - The assistant has no access to tenant identity, account balance, lease ledger, pass database, sensor systems, or external emergency services.

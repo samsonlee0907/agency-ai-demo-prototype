@@ -73,6 +73,20 @@ test("tenant assistant triages maintenance and creates a grounded work order", (
   assert.equal(result.urgency, "Priority");
   assert.equal(result.workOrder.created, true);
   assert.match(result.recommendedAction, /electrics/i);
+  assert.equal(result.floorplan.included, false);
+});
+
+test("tenant assistant attaches only the approved floorplan to relevant Meridian questions", () => {
+  const result = answerTenant("building-meridian", "Where are the toilets on the Level 12 floor plan?");
+  assert.equal(result.category, "Building information");
+  assert.equal(result.floorplan.included, true);
+  assert.equal(result.floorplan.assetId, "floorplan-meridian-level-12");
+  assert.match(result.reply, /static plan|posted building signage/i);
+
+  const unrelated = answerTenant("building-meridian", "What are the concierge hours?");
+  assert.equal(unrelated.floorplan.included, false);
+  const otherBuilding = answerTenant("building-arcade", "Show me the floor plan");
+  assert.equal(otherBuilding.floorplan.included, false);
 });
 
 test("tenant assistant suggestions are ready-to-send tenant confirmations", () => {

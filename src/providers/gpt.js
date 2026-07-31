@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 import { filterSuggestedReplies } from "../assistant-conversation.js";
+import { buildFloorplanAttachment, emptyFloorplanAttachment } from "../floorplan-assets.js";
 import {
   ASSISTANT_REPLY_MAX_LENGTH,
   assistantJsonSchema,
@@ -62,6 +63,23 @@ export function normalizeAssistantFollowUps(result, history = []) {
       result.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?")),
       history
     )
+  };
+}
+
+export function groundTenantFloorplan(result, floorplan) {
+  const modelAttachment = result.floorplan;
+  if (!floorplan) {
+    if (modelAttachment.included || modelAttachment.assetId) {
+      throw new ModelResponseError("GPT returned a floorplan that was not supplied for this request.");
+    }
+    return { ...result, floorplan: emptyFloorplanAttachment() };
+  }
+  if (modelAttachment.assetId && modelAttachment.assetId !== floorplan.asset.id) {
+    throw new ModelResponseError("GPT returned an unknown floorplan identifier.");
+  }
+  return {
+    ...result,
+    floorplan: buildFloorplanAttachment(floorplan.asset, modelAttachment.caption)
   };
 }
 
@@ -171,20 +189,19 @@ export function groundEsgReport(result, evidence) {
       methodology: evidence.methodology
     };
   }
-export function createGptProvider(config) {
+export function createGptProvider(config, { client: clientOverride } = {}) {
   if (!config.configured) return null;
 
-  const apiKey = config.authMode === "entra"
-    ? getBearerTokenProvider(new DefaultAzureCredential(), "https://ai.azure.com/.default")
-    : config.apiKey;
-  const client = new OpenAI({
-    apiKey,
+  const client = clientOverride || new OpenAI({
+    apiKey: config.authMode === "entra"
+      ? getBearerTokenProvider(new DefaultAzureCredential(), "https://ai.azure.com/.default")
+      : config.apiKey,
     baseURL: config.endpoint,
     timeout: 120000,
     maxRetries: 1
   });
 
-  async function generateStructured({ name, instructions, input, jsonSchema, outputSchema }) {
+  async function generateStructured({ name, instructions, input, jsonSchema, outputSchema, userContent = [] }) {
     let response;
     try {
       response = await client.responses.create({
@@ -196,7 +213,7 @@ export function createGptProvider(config) {
           },
           {
             role: "user",
-            content: [{ type: "input_text", text: JSON.stringify(input) }]
+            content: [{ type: "input_text", text: JSON.stringify(input) }, ...userContent]
           }
         ],
         text: {
@@ -287,16 +304,24 @@ export function createGptProvider(config) {
         outputSchema: leaseOutputSchema
       });
     },
-    async respondToTenant(building, message, history) {
+    async respondToTenant(building, message, history, floorplan = null) {
+      const buildingContext = {
+        ...building,
+        floorplans: floorplan ? [floorplan.asset] : []
+      };
       const result = await generateStructured({
         name: "tenant_assistant_response",
-        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge and conversation. Triage maintenance safely and never invent access, lease or account facts. Reason over the full conversation: acknowledge confirmed facts once, advance the task, and never repeat or lightly rephrase a prior reply, question, user message or previously offered quick reply. Do not prefix reply with 'Aurelia:'. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. Ask any qualification or follow-up question directly in reply as Aurelia. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. suggestions are optional ready-to-send tenant answers or decisions that materially advance the conversation. Return an empty suggestions array when the next response requires open-ended tenant details such as a floor, area, time or description. Never offer placeholders such as 'I can confirm...' or 'I will provide...', repeat an earlier choice, put a question or Aurelia prompt in suggestions, instruct support staff, or invent a tenant fact.",
-        input: { building, message, history },
+        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge, conversation and approved floorplan image when present. Triage maintenance safely and never invent access, lease or account facts. Reason over the full conversation: acknowledge confirmed facts once, advance the task, and never repeat or lightly rephrase a prior reply, question, user message or previously offered quick reply. Do not prefix reply with 'Aurelia:'. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. A static floorplan is for general orientation only: never treat it as proof of accessibility, current occupancy, obstructions or an emergency route, and direct emergency-egress questions to posted signage and wardens. Ask any qualification or follow-up question directly in reply as Aurelia. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. The floorplan object is required: include only the supplied asset ID and metadata when an image is supplied and relevant; otherwise set included false and every string to empty. suggestions are optional ready-to-send tenant answers or decisions that materially advance the conversation. Return an empty suggestions array when the next response requires open-ended tenant details such as a floor, area, time or description. Never offer placeholders such as 'I can confirm...' or 'I will provide...', repeat an earlier choice, put a question or Aurelia prompt in suggestions, instruct support staff, or invent a tenant fact.",
+        input: { building: buildingContext, message, history },
         jsonSchema: assistantJsonSchema,
-        outputSchema: assistantOutputSchema
+        outputSchema: assistantOutputSchema,
+        userContent: floorplan
+          ? [{ type: "input_image", image_url: floorplan.dataUrl, detail: "original" }]
+          : []
       });
+      const grounded = groundTenantFloorplan(result, floorplan);
       return ensureEmergencyGuidance(normalizeAssistantFollowUps(
-        result,
+        grounded,
         [...history, { role: "user", content: message }]
       ));
     },

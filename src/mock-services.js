@@ -1,5 +1,6 @@
 import { comparableSales, findBuilding, findLease, findListing, findLead, listings } from "./data.js";
 import { filterSuggestedReplies } from "./assistant-conversation.js";
+import { buildFloorplanAttachment, emptyFloorplanAttachment, findFloorplanForMessage } from "./floorplan-assets.js";
 import { esgPortfolio, findMaintenanceAsset } from "./operations-data.js";
 
 const priorityMap = new Map([
@@ -384,6 +385,7 @@ export function answerTenant(buildingId, message, history = []) {
   const findKnowledge = (pattern) => building.knowledge.find((article) => pattern.test(`${article.title} ${article.content}`));
   const finalize = (response) => ({
     ...response,
+    floorplan: response.floorplan || emptyFloorplanAttachment(),
     suggestions: filterSuggestedReplies(response.suggestions, [...history, { role: "user", content: message }])
   });
 
@@ -641,6 +643,21 @@ export function answerTenant(buildingId, message, history = []) {
 
 function answerTenantNonEmergency(building, normalized) {
   const findKnowledge = (pattern) => building.knowledge.find((article) => pattern.test(`${article.title} ${article.content}`));
+  const floorplan = findFloorplanForMessage(building, normalized);
+
+  if (floorplan) {
+    const floorplanGuide = findKnowledge(/floor plan|floorplan|layout/i);
+    return {
+      reply: `The ${floorplan.floor} plan shows three office areas connected around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east. It does not label lifts, accessible routes or emergency exits, so use posted building signage and warden directions for those routes.`,
+      category: "Building information",
+      urgency: "Routine",
+      recommendedAction: "Open the attached plan for orientation and confirm any accessibility or emergency-route question with building management.",
+      citations: [floorplanGuide?.title || floorplan.title],
+      workOrder: { created: false, reference: "", summary: "No work order required", nextUpdate: "Not applicable" },
+      floorplan: buildFloorplanAttachment(floorplan, "Meridian House Level 12 orientation plan showing office and shared amenity areas."),
+      suggestions: ["I need help locating an amenity shown on the plan."]
+    };
+  }
 
   if (/(leak|water|flood|burst)/.test(normalized)) {
     const responseGuide = findKnowledge(/maintenance|fault|emergency|repair/i) || building.knowledge[0];

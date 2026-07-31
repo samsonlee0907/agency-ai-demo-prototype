@@ -7,7 +7,7 @@ A lightweight, client-facing web app demonstrating eight Microsoft Foundry use c
 3. **Lead qualification agent** — extracts intent, prioritises the enquiry and drafts a personal follow-up.
 4. **Valuation assistant (AVM copilot)** — reconciles fictional comparable transactions into an indicative range and valuer-review draft.
 5. **Lease and contract abstraction** — extracts commercial terms, obligations, critical dates and review flags from sample agreements.
-6. **Tenant virtual assistant** — answers grounded building questions, triages maintenance and creates transparent work-order hand-offs in a conversational interface.
+6. **Tenant virtual assistant** — answers grounded building questions, interprets an approved Level 12 floorplan when relevant, triages maintenance and creates transparent work-order hand-offs in a conversational interface.
 7. **Predictive maintenance and energy** — correlates fictional BMS and condition signals into explainable failure risk, energy impact and technician-ready actions.
 8. **ESG and sustainability copilot** — calculates portfolio KPIs, identifies evidence gaps and prepares a management review draft with owned next actions.
 
@@ -127,4 +127,4 @@ test/                         focused unit and API smoke tests
 
 `GET /api/status` reports only model readiness and deployment names—never endpoints or secrets. Live provider failures return explicit API errors and are never replaced with mock success.
 
-`POST /api/valuation`, `POST /api/lease`, `POST /api/assistant`, `POST /api/maintenance` and `POST /api/esg` use the same server-side GPT-5.6 Terra Responses provider and strict schema validation as the original scenarios. Comparable sales, leases, buildings, telemetry and sustainability records are fictional demo data. Predictive-maintenance readings and ESG metrics are calculated and restored from server evidence after generation, so GPT explains the data without replacing source facts. All advisory, legal, maintenance and sustainability outputs require appropriate professional review.
+`POST /api/valuation`, `POST /api/lease`, `POST /api/assistant`, `POST /api/maintenance` and `POST /api/esg` use the same server-side GPT-5.6 Terra Responses provider and strict schema validation as the original scenarios. Relevant Meridian House floorplan questions add the approved server-owned JPEG as a base64 `input_image`; unrelated questions remain text-only, and returned attachment metadata is restored from the asset registry. Comparable sales, leases, buildings, telemetry and sustainability records are fictional demo data. Predictive-maintenance readings and ESG metrics are calculated and restored from server evidence after generation, so GPT explains the data without replacing source facts. All advisory, legal, maintenance and sustainability outputs require appropriate professional review.

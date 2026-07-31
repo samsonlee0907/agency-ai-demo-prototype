@@ -43,6 +43,9 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.equal(bootstrap.leads.length, 4);
   assert.equal(bootstrap.leaseDocuments.length, 3);
   assert.equal(bootstrap.buildingProfiles.length, 3);
+  const meridian = bootstrap.buildingProfiles.find((building) => building.id === "building-meridian");
+  assert.equal(meridian.floorplans.length, 1);
+  assert.equal(meridian.floorplans[0].floor, "Level 12");
   assert.equal(bootstrap.maintenanceAssets.length, 4);
   assert.equal(bootstrap.esgPortfolio.buildings.length, 3);
 
@@ -50,6 +53,10 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.equal(pdfResponse.status, 200);
   assert.equal(pdfResponse.headers.get("content-type"), "application/pdf");
   assert.equal(pdfResponse.headers.get("x-frame-options"), "SAMEORIGIN");
+
+  const floorplanResponse = await fetch(`${base}/assets/floorplans/meridian-house-level-12-floorplan.jpeg`, { method: "HEAD" });
+  assert.equal(floorplanResponse.status, 200);
+  assert.equal(floorplanResponse.headers.get("content-type"), "image/jpeg");
 
   const matchResponse = await fetch(`${base}/api/match`, {
     method: "POST",
@@ -138,6 +145,23 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   const assistant = await assistantResponse.json();
   assert.equal(assistant.workOrder.created, true);
   assert.equal(assistant.category, "Maintenance");
+  assert.equal(assistant.floorplan.included, false);
+
+  const floorplanAssistantResponse = await fetch(`${base}/api/assistant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "mock",
+      buildingId: "building-meridian",
+      message: "Show me the Level 12 floor plan and main amenities",
+      history: []
+    })
+  });
+  assert.equal(floorplanAssistantResponse.status, 200);
+  const floorplanAssistant = await floorplanAssistantResponse.json();
+  assert.equal(floorplanAssistant.floorplan.included, true);
+  assert.equal(floorplanAssistant.floorplan.assetId, "floorplan-meridian-level-12");
+  assert.equal(floorplanAssistant.floorplan.imageUrl, "/assets/floorplans/meridian-house-level-12-floorplan.jpeg");
 
   const maintenanceResponse = await fetch(`${base}/api/maintenance`, {
     method: "POST",

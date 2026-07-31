@@ -328,6 +328,7 @@ function renderAssistantBuilding() {
     <dl><div><dt>Service desk</dt><dd>${escapeHtml(building.serviceHours)}</dd></div><div><dt>Urgent support</dt><dd>${escapeHtml(building.emergencyContact)}</dd></div></dl>
   `;
   $("#assistant-chat-context").textContent = `${building.name} · 24/7 support`;
+  $("#assistant-floorplan-starter").hidden = !building.floorplans?.length;
   state.assistantHistory = [{
     role: "assistant",
     content: `Welcome to ${building.name}. I can answer building questions, explain tenant services and help log a maintenance request. How can I help?`
@@ -346,8 +347,9 @@ function renderAssistantMessages() {
   const container = $("#chat-messages");
   container.innerHTML = state.assistantHistory.map((message) => {
     const response = message.response;
-    const followUpQuestions = response?.suggestions.filter((suggestion) => suggestion.trim().endsWith("?")) || [];
-    const tenantConfirmations = response?.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?")) || [];
+    const followUpQuestions = response?.suggestions?.filter((suggestion) => suggestion.trim().endsWith("?")) || [];
+    const tenantConfirmations = response?.suggestions?.filter((suggestion) => !suggestion.trim().endsWith("?")) || [];
+    const floorplan = response?.floorplan?.included ? response.floorplan : null;
     return `
       <article class="chat-message ${message.role === "user" ? "is-user" : "is-assistant"}">
         <span class="chat-speaker">${message.role === "user" ? "You" : "Aurelia"}</span>
@@ -363,6 +365,19 @@ function renderAssistantMessages() {
                 <span>Work order created</span><strong>${escapeHtml(response.workOrder.reference)}</strong>
                 <p>${escapeHtml(response.workOrder.summary)}</p><small>${escapeHtml(response.workOrder.nextUpdate)}</small>
               </div>
+            ` : ""}
+            ${floorplan ? `
+              <figure class="assistant-floorplan-card">
+                <a href="${escapeHtml(floorplan.imageUrl)}" target="_blank" rel="noopener">
+                  <img src="${escapeHtml(floorplan.imageUrl)}" alt="${escapeHtml(floorplan.alt)}" loading="lazy">
+                </a>
+                <figcaption>
+                  <span>${escapeHtml(floorplan.floor)}</span>
+                  <strong>${escapeHtml(floorplan.title)}</strong>
+                  <p>${escapeHtml(floorplan.caption)}</p>
+                  <div><a href="${escapeHtml(floorplan.imageUrl)}" target="_blank" rel="noopener">Open full size</a><a href="${escapeHtml(floorplan.imageUrl)}" download>Download image</a></div>
+                </figcaption>
+              </figure>
             ` : ""}
             <p class="assistant-action"><strong>Next step</strong>${escapeHtml(response.recommendedAction)}</p>
             <div class="assistant-citations"><span>Sources</span>${response.citations.map((citation) => `<i>${escapeHtml(citation)}</i>`).join("")}</div>

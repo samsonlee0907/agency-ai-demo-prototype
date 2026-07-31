@@ -185,6 +185,16 @@ export const assistantRequestSchema = z.object({
   history: z.array(assistantHistoryItemSchema).max(10).default([])
 });
 
+const assistantFloorplanSchema = z.object({
+  included: z.boolean(),
+  assetId: z.string().max(80),
+  title: z.string().max(160),
+  floor: z.string().max(80),
+  imageUrl: z.string().max(240),
+  alt: z.string().max(300),
+  caption: z.string().max(500)
+});
+
 export const assistantOutputSchema = z.object({
   reply: z.string().min(20).max(ASSISTANT_REPLY_MAX_LENGTH),
   category: z.enum(["Building information", "Maintenance", "Access & security", "Lease & payments", "Amenity booking", "Emergency"]),
@@ -197,6 +207,7 @@ export const assistantOutputSchema = z.object({
     summary: z.string().max(300),
     nextUpdate: z.string().max(200)
   }),
+  floorplan: assistantFloorplanSchema,
   suggestions: z.array(
     z.string().min(2).max(160).describe("A ready-to-send tenant confirmation or answer statement, never a question.")
   ).max(3)
@@ -495,7 +506,7 @@ export const leaseJsonSchema = {
 export const assistantJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "category", "urgency", "recommendedAction", "citations", "workOrder", "suggestions"],
+  required: ["reply", "category", "urgency", "recommendedAction", "citations", "workOrder", "floorplan", "suggestions"],
   properties: {
     reply: { type: "string" },
     category: { type: "string", enum: ["Building information", "Maintenance", "Access & security", "Lease & payments", "Amenity booking", "Emergency"] },
@@ -511,6 +522,20 @@ export const assistantJsonSchema = {
         reference: { type: "string" },
         summary: { type: "string" },
         nextUpdate: { type: "string" }
+      }
+    },
+    floorplan: {
+      type: "object",
+      additionalProperties: false,
+      required: ["included", "assetId", "title", "floor", "imageUrl", "alt", "caption"],
+      properties: {
+        included: { type: "boolean", description: "True only when the supplied approved floorplan image is relevant to the answer." },
+        assetId: { type: "string", maxLength: 80, description: "Use the supplied floorplan asset ID when included; otherwise return an empty string." },
+        title: { type: "string", maxLength: 160, description: "Use the supplied title when included; otherwise return an empty string." },
+        floor: { type: "string", maxLength: 80, description: "Use the supplied floor label when included; otherwise return an empty string." },
+        imageUrl: { type: "string", maxLength: 240, description: "Use the supplied public image URL when included; otherwise return an empty string." },
+        alt: { type: "string", maxLength: 300, description: "Use the supplied alternative text when included; otherwise return an empty string." },
+        caption: { type: "string", maxLength: 500, description: "A concise grounded description of what the plan shows, or an empty string when not included." }
       }
     },
     suggestions: {
