@@ -411,6 +411,24 @@ export function floorplanAnnotationFallbackForMessage(message) {
       }
     };
   }
+  if (/\b(?:nearest|closest|next to|adjacent|adjoin(?:s|ing)?|beside)\b/.test(normalized) && regionIds.length) {
+    const [targetId] = regionIds;
+    const neighbourId = adjacentRegionIdOf(targetId, regionIds.slice(1));
+    if (neighbourId) {
+      return {
+        selections: [
+          select(targetId, "primary", "This is the area referenced by the question."),
+          select(neighbourId, "secondary", "This is the validated adjoining area.")
+        ],
+        relationship: {
+          type: "adjacency",
+          fromRegionId: targetId,
+          toRegionId: neighbourId,
+          direction: null
+        }
+      };
+    }
+  }
   if (wayfindingPattern.test(normalized) || /\b(where|locate|find|nearest|closest)\b/.test(normalized)) {
     const [targetId] = regionIds;
     const contextId = contextByTarget[targetId];

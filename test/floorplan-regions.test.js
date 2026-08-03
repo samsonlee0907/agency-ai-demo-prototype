@@ -124,7 +124,10 @@ test("toilet and wayfinding questions have authoritative fallback intents", () =
     ["Navigate me from the toilets to reception.", ["reception", "toilets"], "direction"],
     ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"], "direction"],
     ["How do I get to the toilets?", ["toilets", "passage"], "location"],
-    ["How do I get to the ladies washroom?", ["toilets_ladies", "passage"], "location"]
+    ["How do I get to the ladies washroom?", ["toilets_ladies", "passage"], "location"],
+    ["Which room is closest to the restaurant?", ["restaurant", "office_east_64_2"], "adjacency"],
+    ["What is adjacent to the restaurant?", ["restaurant", "office_east_64_2"], "adjacency"],
+    ["What is next to the toilets?", ["toilets", "passage"], "adjacency"]
   ];
   for (const [message, regionIds, relationship] of scenarios) {
     const intent = floorplanAnnotationFallbackForMessage(message);
