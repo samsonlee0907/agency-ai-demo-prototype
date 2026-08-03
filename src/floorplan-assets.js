@@ -31,7 +31,7 @@ export function findFloorplanForMessage(building, message) {
   if (!building?.floorplans?.length) return null;
   const normalized = String(message || "").toLowerCase();
   const asksForPlan = /\b(floor\s*plan|floorplan|layout|map|wayfinding|navigate|navigation)\b/.test(normalized);
-  const asksAboutPlanFeature = /\b(office space|rooms?|meeting room|reception|restaurant|bar|kitchen|toilets?|bathrooms?|amenit(?:y|ies)|balcony|verandah|passage|stairs?|lifts?|elevators?|exits?)\b/.test(normalized);
+  const asksAboutPlanFeature = /\b(offices?|rooms?|meeting room|reception|restaurant|dining|bar|kitchen|storage|toilets?|bathrooms?|amenit(?:y|ies)|balcony|verandah|passage|stairs?|lifts?|elevators?|exits?)\b/.test(normalized);
   if (!asksForPlan && !asksAboutPlanFeature) return null;
   return building.floorplans.map((floorplan) => findFloorplanAsset(floorplan.id)).find(Boolean) || null;
 }
@@ -44,11 +44,12 @@ export function emptyFloorplanAttachment() {
     floor: "",
     imageUrl: "",
     alt: "",
-    caption: ""
+    caption: "",
+    annotation: null
   };
 }
 
-export function buildFloorplanAttachment(asset, caption = "") {
+export function buildFloorplanAttachment(asset, caption = "", annotation = null) {
   return {
     included: true,
     assetId: asset.id,
@@ -56,7 +57,8 @@ export function buildFloorplanAttachment(asset, caption = "") {
     floor: asset.floor,
     imageUrl: asset.imageUrl,
     alt: asset.alt,
-    caption: caption || asset.description
+    caption: caption || asset.description,
+    annotation
   };
 }
 

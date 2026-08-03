@@ -13,6 +13,7 @@ This scenario answers tenant questions from a selected building's fictional know
 | Contracts | `assistantRequestSchema`, `assistantOutputSchema`, and `assistantJsonSchema` in `src/schemas.js` |
 | Building knowledge | `buildingProfiles` in `src/data.js` |
 | Approved floorplan registry and loader | `src/floorplan-assets.js` |
+| Validated semantic regions and renderer hints | `src/floorplan-regions.js` |
 | Repetition filtering | `src/assistant-conversation.js` |
 | Mock triage | `answerTenant()` in `src/mock-services.js` |
 | Live response and safety normalization | `respondToTenant()`, `normalizeAssistantFollowUps()`, and `ensureEmergencyGuidance()` in `src/providers/gpt.js` |
@@ -25,7 +26,7 @@ sequenceDiagram
     participant B as Browser
     participant A as Express API
     participant D as Building knowledge
-    participant F as Approved floorplan registry
+    participant F as Approved asset and region catalogs
     participant G as Mock service or GPT-5.6 Terra
 
     U->>B: Enter message or select a tenant reply
@@ -36,13 +37,13 @@ sequenceDiagram
     A->>F: Check server-side floorplan relevance
     alt Live and relevant Meridian question
         F-->>A: Approved metadata and JPEG bytes
-        A->>G: Building, message, history, input_image
+        A->>G: Building, region IDs, message, history, input_image
     else Mock or unrelated question
         A->>G: Building, message, and history only
     end
-    G-->>A: Structured reply
+    G-->>A: Structured reply with region IDs only
     A->>A: Validate output
-    A->>F: Restore authoritative attachment metadata
+    A->>F: Validate IDs and restore trusted geometry
     A->>A: Move model questions into reply
     A->>A: Remove repeated suggestions
     A->>A: Enforce 000 emergency guidance
@@ -78,9 +79,18 @@ type FloorplanAsset = {
   alt: string;
   description: string;
 };
+
+type FloorplanRegion = {
+  id: string;
+  label: string;
+  type: "room" | "circulation" | "transition" | "service" | "outdoor";
+  areaSqm?: number;
+  polygon: Array<{ x: number; y: number }>; // normalized 0-1000
+  labelAnchor: { x: number; y: number };
+};
 ```
 
-The three fictional profiles cover Meridian House, The Arcade, and Southbank Exchange. Their articles cover access, deliveries, HVAC, amenities, maintenance response, waste, tenant responsibilities, and emergency isolation. Only Meridian House has an approved floorplan: the neutral demonstration JPEG at `public/assets/floorplans/meridian-house-level-12-floorplan.jpeg`.
+The three fictional profiles cover Meridian House, The Arcade, and Southbank Exchange. Their articles cover access, deliveries, HVAC, amenities, maintenance response, waste, tenant responsibilities, and emergency isolation. Only Meridian House has an approved floorplan: the neutral demonstration JPEG at `public/assets/floorplans/meridian-house-level-12-floorplan.jpeg`. Its server-owned `meridian-house-level-12` catalog contains stable semantic IDs and validated polygons for supported rooms and circulation areas. The original 2256×1304 JPEG is never modified.
 
 ## HTTP request
 
@@ -143,6 +153,17 @@ Refreshing or changing the building resets the relevant browser conversation; th
 ```ts
 type AssistantModelInput = {
   building: BuildingProfile;
+  floorplanCatalog: null | {
+    id: string;
+    assetId: string;
+    regions: Array<{
+      id: string;
+      label: string;
+      type: string;
+      areaSqm: number | null;
+      description: string;
+    }>;
+  };
   message: string;
   history: Array<{
     role: "user" | "assistant";
@@ -165,6 +186,8 @@ For a relevant Meridian House question, the server resolves the asset from its f
 
 The browser never supplies an image URL, asset ID, file path, or image bytes. GPT-5.6 Terra receives the image only when the current message mentions a floorplan, layout, navigation, or a feature represented on the plan. Image input uses `detail: "original"` because floorplans contain dense labels and spatial relationships.
 
+The model-facing region catalog contains semantic descriptions but no polygons, boundaries, label anchors, dimensions, or SVG. Terra can select regions but cannot author rendering geometry.
+
 Terra is instructed to:
 
 - answer only from building knowledge and conversation;
@@ -175,6 +198,10 @@ Terra is instructed to:
 - create a work order only for an actionable facilities fault;
 - cite supplied articles or contact details;
 - use a floorplan only when the approved image was supplied;
+- return only approved region IDs, `primary`/`secondary`/`context` roles, relationship intent, optional direction, and short reasons;
+- return `annotation: null` when no validated catalog region confidently supports the answer;
+- never return coordinates, boxes, polygons, paths, SVG, colors, labels, or dimensions;
+- never infer a walking route or door connectivity;
 - distinguish visible layout interpretation from authoritative building policy;
 - never present a static plan as proof of accessibility, current obstructions, occupancy, or emergency routes;
 - prioritize emergency safety.
@@ -210,6 +237,32 @@ type AssistantResponse = {
     imageUrl: string;        // up to 240
     alt: string;             // up to 300
     caption: string;         // up to 500
+    annotation: null | {
+      width: 2256;
+      height: 1304;
+      regions: Array<{
+        id: string;
+        label: string;
+        type: string;
+        areaSqm: number | null;
+        role: "primary" | "secondary" | "context";
+        reason: string;
+        polygon: Array<{ x: number; y: number }>; // authoritative source pixels
+        labelAnchor: { x: number; y: number };
+      }>;
+      relationship: {
+        type: "location" | "adjacency" | "direction" | "count" | "size";
+        fromRegionId: string | null;
+        toRegionId: string | null;
+        direction: string | null;
+        label: string;
+      };
+      marker: null | {
+        kind: "shared-boundary" | "direction-arrow" | "axis-arrow";
+        points: [{ x: number; y: number }, { x: number; y: number }];
+      };
+      safetyNote: string;
+    };
   };
   suggestions: string[];     // 0-3, each 2-160
 };
@@ -219,7 +272,7 @@ type AssistantResponse = {
 
 After Zod validation, the provider applies three behavioral controls:
 
-1. **Floorplan grounding:** when no image was supplied, any returned floorplan ID is rejected. When an image was supplied, an unknown ID is rejected and the title, floor, URL and alternative text are replaced from the server registry. The server attaches the approved image for the relevant request even if the model leaves the optional caption empty.
+1. **Floorplan grounding:** when no image was supplied, any returned floorplan or annotation ID is rejected. When an image was supplied, unknown or duplicate region IDs, inconsistent endpoints, and undeclared adjacency claims are rejected. The server replaces attachment metadata and every selected region with authoritative labels, source-pixel polygons, dimensions, and renderer hints. Model output has no geometry fields.
 2. **Question normalization:** any suggestion ending in `?` is removed from the button list and appended to Aurelia's `reply` when it fits within the 1,600-character limit.
 3. **Emergency guidance:** when `urgency` is `Emergency` and the reply does not contain `000`, the server prepends explicit emergency-services guidance, truncating the original response if necessary.
 
@@ -236,10 +289,17 @@ Mock mode uses keyword routing:
 | Air conditioning, hot, cold, HVAC | Routine comfort work order |
 | Pass, access, visitor, entry | Access guidance |
 | Rent, invoice, lease, payment | Route to authorized property management |
-| Floorplan, layout, navigation, or plan feature | Level 12 layout summary with approved inline image |
+| Specific supported floorplan relationship | Question-specific validated regions and marker |
+| Broad or unsupported floorplan request | Approved original plan without a highlight |
 | Other | General building information |
 
-It cites the closest building article and/or the building contact. Floorplan questions cite the matching Meridian House floorplan article and return the same server-owned attachment metadata as Live mode. Work-order references are fictional response fields.
+It cites the closest building article and/or the building contact. Floorplan questions cite the matching Meridian House floorplan article and pass deterministic ID-only intents through the same grounding helper as Live mode. Mock responses cover location, adjacency, direction, count, size, and transition-direction examples. Work-order references are fictional response fields.
+
+## Why validated regions
+
+A 10-case GPT-5.6 Terra evaluation separated answer correctness from visual grounding. Direct uncorrected boxes averaged 97.5 for answers and 89 for grounding, but the three abstract cases averaged only 76.7 grounding and passed 1/3. Model-generated polygons improved those abstract cases to 82 and 2/3, but one polygon self-intersected and a route crossed walls and the stair core. Model-selected validated regions averaged 98 grounding and passed 3/3.
+
+The portal therefore uses full-region fills for entities, a catalog-declared shared boundary for adjacency, a centroid arrow for simple direction, and an axis arrow contained inside a transition region. It never renders an inferred walking route without a separately validated topology graph.
 
 ## Data and operational boundaries
 
@@ -247,7 +307,9 @@ It cites the closest building article and/or the building contact. Floorplan que
 - User messages and recent history are sent to Terra in Live mode and are not persisted by the server.
 - The approved JPEG bytes are sent to Terra only for server-detected relevant Meridian House questions; image inputs are billed as model tokens.
 - The public image URL is safe to display, but its local filesystem path is never accepted from or returned to the browser.
-- The inline card provides full-size open and download controls. It is a static demonstration plan, not a live occupancy, accessibility, or emergency-navigation system.
+- The inline card overlays accessible SVG regions on the unchanged JPEG, provides a keyboard-operable original-plan toggle, visible labels and a text legend, and retains full-size open and download controls.
+- Unsupported or ambiguous questions return text-only or the approved original plan without a highlight.
+- The plan is a static demonstration, not a live occupancy, accessibility, connectivity, wayfinding, or emergency-navigation system.
 - `workOrder.created: true` does not create anything outside the response JSON.
 - Citations name source articles but do not provide retrieval-time document links.
 - The assistant has no access to tenant identity, account balance, lease ledger, pass database, sensor systems, or external emergency services.

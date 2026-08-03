@@ -25,11 +25,8 @@ const sources = [
 function assistantResponse(floorplan = {
   included: false,
   assetId: "",
-  title: "",
-  floor: "",
-  imageUrl: "",
-  alt: "",
-  caption: ""
+  caption: "",
+  annotation: null
 }) {
   return {
     reply: "Here is a grounded response based on the supplied building information.",
@@ -148,7 +145,8 @@ test("emergency assistant responses always include safe 000 guidance", () => {
       floor: "",
       imageUrl: "",
       alt: "",
-      caption: ""
+      caption: "",
+      annotation: null
     },
     suggestions: ["I am in a safe area."]
   };
@@ -178,11 +176,19 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
           output_text: JSON.stringify(assistantResponse(hasImage ? {
             included: true,
             assetId: floorplan.id,
-            title: "Model supplied title",
-            floor: "Model supplied floor",
-            imageUrl: "https://untrusted.example/floorplan.jpeg",
-            alt: "Model supplied alt text",
-            caption: "The plan shows office and amenity areas."
+            caption: "The restaurant and stairs are highlighted for comparison.",
+            annotation: {
+              selections: [
+                { regionId: "restaurant", role: "primary", reason: "This is the requested destination." },
+                { regionId: "central_stairs", role: "secondary", reason: "This is the spatial reference." }
+              ],
+              relationship: {
+                type: "location",
+                fromRegionId: "central_stairs",
+                toRegionId: "restaurant",
+                direction: "northeast"
+              }
+            }
           } : undefined))
         };
       }
@@ -208,6 +214,11 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   assert.deepEqual(imageInput, { type: "input_image", image_url: dataUrl, detail: "original" });
   assert.equal(grounded.floorplan.imageUrl, floorplan.imageUrl);
   assert.equal(grounded.floorplan.title, floorplan.title);
+  assert.equal(grounded.floorplan.annotation.regions[0].label, "Restaurant");
+  assert.equal(grounded.floorplan.annotation.marker.kind, "direction-arrow");
+  const modelInput = JSON.parse(requests[0].input[1].content[0].text);
+  assert.equal(modelInput.floorplanCatalog.id, "meridian-house-level-12");
+  assert.doesNotMatch(JSON.stringify(modelInput.floorplanCatalog), /polygon|coordinates|axis|boundary/i);
 
   const textOnly = await provider.respondToTenant(building, "What are the concierge hours?", []);
   assert.equal(requests[1].input[1].content.some((item) => item.type === "input_image"), false);
@@ -221,11 +232,34 @@ test("tenant floorplan grounding rejects unknown model asset identifiers", () =>
       assistantResponse({
         included: true,
         assetId: "invented-floorplan",
-        title: "Invented",
-        floor: "Level 99",
-        imageUrl: "https://untrusted.example/floorplan.jpeg",
-        alt: "Invented",
-        caption: "Invented"
+        caption: "Invented",
+        annotation: null
+      }),
+      { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+    ),
+    ModelResponseError
+  );
+});
+
+test("tenant floorplan grounding rejects unknown model region identifiers", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  assert.throws(
+    () => groundTenantFloorplan(
+      assistantResponse({
+        included: true,
+        assetId: floorplan.id,
+        caption: "Invented",
+        annotation: {
+          selections: [
+            { regionId: "invented-region", role: "primary", reason: "Invented region." }
+          ],
+          relationship: {
+            type: "count",
+            fromRegionId: null,
+            toRegionId: null,
+            direction: null
+          }
+        }
       }),
       { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
     ),

@@ -162,6 +162,24 @@ test("serves status, bootstrap data and deterministic matching", async (context)
   assert.equal(floorplanAssistant.floorplan.included, true);
   assert.equal(floorplanAssistant.floorplan.assetId, "floorplan-meridian-level-12");
   assert.equal(floorplanAssistant.floorplan.imageUrl, "/assets/floorplans/meridian-house-level-12-floorplan.jpeg");
+  assert.equal(floorplanAssistant.floorplan.annotation, null);
+
+  const annotatedFloorplanResponse = await fetch(`${base}/api/assistant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "mock",
+      buildingId: "building-meridian",
+      message: "Where is the restaurant relative to the central stairs?",
+      history: []
+    })
+  });
+  assert.equal(annotatedFloorplanResponse.status, 200);
+  const annotatedFloorplan = await annotatedFloorplanResponse.json();
+  assert.equal(annotatedFloorplan.floorplan.annotation.width, 2256);
+  assert.equal(annotatedFloorplan.floorplan.annotation.height, 1304);
+  assert.equal(annotatedFloorplan.floorplan.annotation.regions[0].id, "restaurant");
+  assert.equal(annotatedFloorplan.floorplan.annotation.marker.kind, "direction-arrow");
 
   const maintenanceResponse = await fetch(`${base}/api/maintenance`, {
     method: "POST",

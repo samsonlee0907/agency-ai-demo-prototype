@@ -1,6 +1,7 @@
 import { comparableSales, findBuilding, findLease, findListing, findLead, listings } from "./data.js";
 import { filterSuggestedReplies } from "./assistant-conversation.js";
 import { buildFloorplanAttachment, emptyFloorplanAttachment, findFloorplanForMessage } from "./floorplan-assets.js";
+import { groundFloorplanAnnotation } from "./floorplan-regions.js";
 import { esgPortfolio, findMaintenanceAsset } from "./operations-data.js";
 
 const priorityMap = new Map([
@@ -641,20 +642,135 @@ export function answerTenant(buildingId, message, history = []) {
     };
   }
 
+function floorplanIntent(selections, type, fromRegionId = null, toRegionId = null, direction = null) {
+  return {
+    selections,
+    relationship: { type, fromRegionId, toRegionId, direction }
+  };
+}
+
+function mockFloorplanAnswer(normalized) {
+  const select = (regionId, role, reason) => ({ regionId, role, reason });
+  if (/64\.2/.test(normalized) && /(closer|closest|adjacent)/.test(normalized) && /restaurant/.test(normalized)) {
+    return {
+      reply: "The eastern 64.2 m² office is closer because it directly adjoins the restaurant. The western 64.2 m² office is separated from the restaurant by the eastern office.",
+      caption: "The adjoining eastern office and restaurant are highlighted with their shared boundary.",
+      annotation: floorplanIntent([
+        select("office_east_64_2", "primary", "This is the office that directly adjoins the restaurant."),
+        select("restaurant", "secondary", "This is the comparison destination."),
+        select("office_west_64_2", "context", "This is the alternative office for comparison.")
+      ], "adjacency", "office_east_64_2", "restaurant")
+    };
+  }
+  if (/nearest.*(dining|restaurant)|reception.*restaurant|restaurant.*reception/.test(normalized)) {
+    return {
+      reply: "The nearest labelled dining area is the Restaurant, generally north of Reception.",
+      caption: "Reception and the restaurant are highlighted with their general north-south relationship.",
+      annotation: floorplanIntent([
+        select("restaurant", "primary", "This is the requested dining area."),
+        select("reception", "secondary", "This is the starting reference.")
+      ], "direction", "reception", "restaurant", "north")
+    };
+  }
+  if (/restaurant/.test(normalized) && /stairs?/.test(normalized)) {
+    return {
+      reply: "The restaurant is to the right and above the central stairs, generally northeast on the plan.",
+      caption: "The restaurant and central stairs are highlighted to show their relative location.",
+      annotation: floorplanIntent([
+        select("restaurant", "primary", "This is the requested destination."),
+        select("central_stairs", "secondary", "This is the spatial reference.")
+      ], "location", "central_stairs", "restaurant", "northeast")
+    };
+  }
+  if (/toilets?/.test(normalized) && /passage/.test(normalized)) {
+    return {
+      reply: "The toilets are immediately west, or left, of the passage.",
+      caption: "The western toilet block and adjacent passage are highlighted.",
+      annotation: floorplanIntent([
+        select("toilets", "primary", "This is the requested amenity."),
+        select("passage", "secondary", "This is the spatial reference.")
+      ], "location", "passage", "toilets", "west")
+    };
+  }
+  if (/kitchen/.test(normalized) && /reception/.test(normalized)) {
+    return {
+      reply: "The kitchen is below and slightly right of reception, generally southeast on the plan.",
+      caption: "Reception and the kitchen are highlighted to show their relative location.",
+      annotation: floorplanIntent([
+        select("kitchen", "primary", "This is the requested service room."),
+        select("reception", "secondary", "This is the spatial reference.")
+      ], "location", "reception", "kitchen", "southeast")
+    };
+  }
+  if (/(largest|biggest).*(office)|office.*(largest|biggest)/.test(normalized)) {
+    return {
+      reply: "The 114.4 m² office in the lower-left is the largest of the three labelled office spaces.",
+      caption: "All three offices are highlighted for a direct size comparison.",
+      annotation: floorplanIntent([
+        select("office_114_4", "primary", "Its labelled area is 114.4 m²."),
+        select("office_west_64_2", "secondary", "Its labelled area is 64.2 m²."),
+        select("office_east_64_2", "secondary", "Its labelled area is 64.2 m².")
+      ], "size")
+    };
+  }
+  if (/(how many|number of).*(office)/.test(normalized)) {
+    return {
+      reply: "Three separately labelled office spaces are shown.",
+      caption: "The three counted office regions are highlighted.",
+      annotation: floorplanIntent([
+        select("office_114_4", "primary", "Counted office one."),
+        select("office_west_64_2", "primary", "Counted office two."),
+        select("office_east_64_2", "primary", "Counted office three.")
+      ], "count")
+    };
+  }
+  if (/(how many|number of|flank)/.test(normalized) && /storage/.test(normalized)) {
+    return {
+      reply: "Two storage rooms directly flank the central stairs, one on each side.",
+      caption: "Both storage rooms and the central stair reference are highlighted.",
+      annotation: floorplanIntent([
+        select("storage_west", "primary", "Counted storage room one."),
+        select("storage_east", "primary", "Counted storage room two."),
+        select("central_stairs", "context", "This is the flanked reference.")
+      ], "count")
+    };
+  }
+  if (/verandah|transition/.test(normalized) && /restaurant/.test(normalized)) {
+    return {
+      reply: "The labelled transition area is the Verandah, running east toward the Restaurant. This is a general spatial direction, not a verified walking route.",
+      caption: "The verandah is highlighted with an eastward axis that remains inside the validated transition region.",
+      annotation: floorplanIntent([
+        select("verandah", "primary", "This is the named transition area."),
+        select("restaurant", "secondary", "This is the destination reference."),
+        select("office_114_4", "context", "This is the starting-area context.")
+      ], "direction", "office_114_4", "restaurant", "east")
+    };
+  }
+  return {
+    reply: "The Level 12 plan shows three office areas around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east. No single validated region confidently matches this broad request, so the original plan is shown without a highlight.",
+    caption: "Meridian House Level 12 orientation plan shown without an inferred highlight.",
+    annotation: null
+  };
+}
+
 function answerTenantNonEmergency(building, normalized) {
   const findKnowledge = (pattern) => building.knowledge.find((article) => pattern.test(`${article.title} ${article.content}`));
   const floorplan = findFloorplanForMessage(building, normalized);
 
   if (floorplan) {
     const floorplanGuide = findKnowledge(/floor plan|floorplan|layout/i);
+    const floorplanAnswer = mockFloorplanAnswer(normalized);
+    const annotation = groundFloorplanAnnotation(floorplan.id, floorplanAnswer.annotation);
     return {
-      reply: `The ${floorplan.floor} plan shows three office areas connected around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east. It does not label lifts, accessible routes or emergency exits, so use posted building signage and warden directions for those routes.`,
+      reply: `${floorplanAnswer.reply} The static plan does not verify accessibility, obstructions or emergency routes; use posted signage and warden directions for those needs.`,
       category: "Building information",
       urgency: "Routine",
-      recommendedAction: "Open the attached plan for orientation and confirm any accessibility or emergency-route question with building management.",
+      recommendedAction: annotation
+        ? "Review the highlighted regions and use the original-plan toggle to inspect the unannotated source."
+        : "Open the attached original plan for orientation and confirm route questions with building management.",
       citations: [floorplanGuide?.title || floorplan.title],
       workOrder: { created: false, reference: "", summary: "No work order required", nextUpdate: "Not applicable" },
-      floorplan: buildFloorplanAttachment(floorplan, "Meridian House Level 12 orientation plan showing office and shared amenity areas."),
+      floorplan: buildFloorplanAttachment(floorplan, floorplanAnswer.caption, annotation),
       suggestions: ["I need help locating an amenity shown on the plan."]
     };
   }
