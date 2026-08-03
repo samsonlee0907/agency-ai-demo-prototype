@@ -761,6 +761,24 @@ function mockFloorplanAnswer(normalized) {
       ], "direction", "office_114_4", "restaurant", "east")
     };
   }
+  const locationReplies = [
+    [/\bstairs?\b/, "The central stair core runs down the middle of the plan, directly flanked by the two storage rooms."],
+    [/\bkitchen\b/, "The kitchen is at the lower right of the plan, below and slightly right of Reception."],
+    [/\breception\b/, "Reception is on the eastern side of the plan, directly below the Restaurant."],
+    [/\b(?:restaurant|dining)\b/, "The Restaurant occupies the upper right of the plan, above Reception."],
+    [/\bpassage\b/, "The Passage is the north-south circulation route between the toilet block and the western offices."],
+    [/\bverandah\b/, "The Verandah is the labelled transition area toward the lower left of the plan."]
+  ];
+  if (/\b(where|locate|find|nearest|closest)\b/.test(normalized)) {
+    const match = locationReplies.find(([pattern]) => pattern.test(normalized));
+    if (match) {
+      return {
+        reply: `${match[1]} This is a general orientation description, not a verified walking route.`,
+        caption: "Validated floorplan regions highlighted for spatial orientation only.",
+        annotation: null
+      };
+    }
+  }
   return plainPlan();
 }
 

@@ -117,15 +117,18 @@ test("tenant assistant Mock mode annotates count and size evidence deterministic
 
 test("tenant assistant grounds toilet variants and safe wayfinding overlays", () => {
   const toiletScenarios = [
-    ["How many toilets does the ladies washroom have?", /5 enclosed cubicles/, ["toilets"]],
-    ["How many cubicles are in the ladies washroom?", /5 enclosed cubicles/, ["toilets"]],
-    ["How many toilets are in the women's bathroom?", /5 enclosed cubicles/, ["toilets"]],
-    ["How many washrooms are shown on Level 12?", /one labelled toilet area/, ["toilets"]],
-    ["Where is the ladies washroom?", /does not designate separate ladies or men's/, ["toilets", "passage"]],
-    ["Is the ladies washroom next to the passage?", /immediately west of the labelled Passage/, ["toilets", "passage"]],
-    ["How many sinks are in the ladies washroom?", /does not provide an authoritative count/, ["toilets", "passage"]],
-    ["How many urinals are shown?", /does not provide an authoritative count/, ["toilets", "passage"]],
-    ["Where is the men's washroom?", /does not designate separate ladies or men's/, ["toilets", "passage"]]
+    ["How many toilets does the ladies washroom have?", /Ladies washroom shows 3 enclosed toilet cubicles/, ["toilets_ladies"]],
+    ["How many cubicles are in the ladies washroom?", /Ladies washroom shows 3 enclosed toilet cubicles/, ["toilets_ladies"]],
+    ["How many toilets are in the women's bathroom?", /Ladies washroom shows 3 enclosed toilet cubicles/, ["toilets_ladies"]],
+    ["How many toilets are in the gents?", /Gents washroom shows 2 enclosed toilet cubicles/, ["toilets_gents"]],
+    ["How many washrooms are shown on Level 12?", /two washrooms/, ["toilets"]],
+    ["Where is the ladies washroom?", /Ladies washroom is the eastern half/, ["toilets_ladies", "passage"]],
+    ["Is the ladies washroom next to the passage?", /Ladies washroom is the eastern half/, ["toilets_ladies", "passage"]],
+    ["How many sinks are in the ladies washroom?", /Ladies washroom shows 4 wash basins/, ["toilets_ladies"]],
+    ["How many urinals are shown?", /Toilets block shows 4 urinals/, ["toilets"]],
+    ["Where is the men's washroom?", /Gents washroom is at the far western end/, ["toilets_gents", "toilets_ladies"]],
+    ["Where is the gents?", /Gents washroom is at the far western end/, ["toilets_gents", "toilets_ladies"]],
+    ["How many fixtures are in the toilets?", /15 plumbing fixtures/, ["toilets"]]
   ];
   for (const [message, replyPattern, regionIds] of toiletScenarios) {
     const result = answerTenant("building-meridian", message);
@@ -138,6 +141,9 @@ test("tenant assistant grounds toilet variants and safe wayfinding overlays", ()
     ["Show me the way from the central stairs to the restaurant.", ["restaurant", "central_stairs"]],
     ["Navigate me from the toilets to reception.", ["reception", "toilets"]],
     ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"]],
+    ["how to get to the male's washroom from the kitchen?", ["toilets_gents", "kitchen"]],
+    ["How do I get to the ladies room from reception?", ["toilets_ladies", "reception"]],
+    ["Where is the kitchen?", ["kitchen", "reception"]],
     ["How do I get to the toilets?", ["toilets", "passage"]]
   ];
   for (const [message, regionIds] of wayfindingScenarios) {
