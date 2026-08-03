@@ -6,8 +6,10 @@ import {
   floorplanAnnotationFallbackForMessage,
   floorplanCatalogForModel,
   groundFloorplanAnnotation,
+  groundFloorplanReply,
   validateFloorplanRegionCatalog
 } from "../src/floorplan-regions.js";
+import { floorplanAnnotationRequested } from "../src/floorplan-assets.js";
 import {
   assistantJsonSchema,
   floorplanAnnotationIntentSchema
@@ -44,23 +46,74 @@ test("model catalog exposes semantics without any renderer geometry", () => {
   const serialized = JSON.stringify(modelCatalog);
   assert.equal(modelCatalog.regions.length, FLOORPLAN_REGION_IDS.length);
   assert.doesNotMatch(serialized, /polygon|labelAnchor|boundary|axis|coordinates/i);
+  const toilets = modelCatalog.regions.find((region) => region.id === "toilets");
+  assert.deepEqual(toilets.facts, {
+    genderDesignation: null,
+    enclosedCubicleCount: 5,
+    totalFixtureCount: null,
+    basinCount: null,
+    urinalCount: null
+  });
 });
 
-test("unambiguous count and stairs questions have authoritative fallback intents", () => {
-  const count = floorplanAnnotationFallbackForMessage("how many toilets does the ladies washroom have?");
-  assert.deepEqual(count.selections.map((item) => item.regionId), ["toilets"]);
-  assert.equal(count.relationship.type, "count");
+test("floorplan intent recognizes washroom and wayfinding wording without annotating generic display", () => {
+  for (const message of [
+    "How many cubicles are in the ladies washroom?",
+    "Where is the men's washroom?",
+    "How do I get from reception to the restaurant?",
+    "Show a route from the stairs to the restaurant.",
+    "Navigate me from the toilets to reception."
+  ]) {
+    assert.equal(floorplanAnnotationRequested(message), true, message);
+  }
+  assert.equal(floorplanAnnotationRequested("Show me the Level 12 floor plan"), false);
+});
 
-  const stairs = floorplanAnnotationFallbackForMessage("Where's the stairs?");
-  assert.deepEqual(stairs.selections.map((item) => item.regionId), [
-    "central_stairs",
-    "storage_west",
-    "storage_east"
-  ]);
-  assert.equal(stairs.relationship.type, "location");
-
+test("toilet and wayfinding questions have authoritative fallback intents", () => {
+  const scenarios = [
+    ["how many toilets does the ladies washroom have?", ["toilets"], "count"],
+    ["How many cubicles are in the ladies washroom?", ["toilets"], "count"],
+    ["How many sinks are in the ladies washroom?", ["toilets", "passage"], "location"],
+    ["How many urinals are shown?", ["toilets", "passage"], "location"],
+    ["Where is the men's washroom?", ["toilets", "passage"], "location"],
+    ["Is the ladies washroom next to the passage?", ["toilets", "passage"], "adjacency"],
+    ["Where's the stairs?", ["central_stairs", "storage_west", "storage_east"], "location"],
+    ["Where is the restaurant relative to the central stairs?", ["restaurant", "central_stairs"], "direction"],
+    ["How do I get from reception to the restaurant?", ["restaurant", "reception"], "direction"],
+    ["Navigate me from the toilets to reception.", ["reception", "toilets"], "direction"],
+    ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"], "direction"],
+    ["How do I get to the toilets?", ["toilets", "passage"], "location"]
+  ];
+  for (const [message, regionIds, relationship] of scenarios) {
+    const intent = floorplanAnnotationFallbackForMessage(message);
+    assert.deepEqual(intent.selections.map((item) => item.regionId), regionIds, message);
+    assert.equal(intent.relationship.type, relationship, message);
+    assert.doesNotThrow(() => groundFloorplanAnnotation(assetId, intent), message);
+  }
   assert.equal(floorplanAnnotationFallbackForMessage("Show me the Level 12 floor plan"), null);
   assert.equal(floorplanAnnotationFallbackForMessage("Where is the nearest lift?"), null);
+});
+
+test("toilet replies preserve verified cubicle evidence and facility uncertainty", () => {
+  const cubicles = groundFloorplanReply(
+    "How many cubicles are in the ladies washroom?",
+    "Model supplied answer"
+  );
+  assert.match(cubicles, /5 enclosed cubicles/);
+  assert.match(cubicles, /does not designate separate ladies or men's facilities/);
+
+  const sinks = groundFloorplanReply(
+    "How many sinks are in the ladies washroom?",
+    "Model supplied answer"
+  );
+  assert.match(sinks, /does not provide an authoritative count/);
+  assert.doesNotMatch(sinks, /\b5\b/);
+
+  const washrooms = groundFloorplanReply(
+    "How many washrooms are shown on Level 12?",
+    "Model supplied answer"
+  );
+  assert.match(washrooms, /one labelled toilet area/);
 });
 
 test("strict annotation schemas accept IDs and reject raw geometry", () => {
@@ -173,6 +226,12 @@ test("grounding uses only approved adjacency and transition markers", () => {
     }
   });
   assert.equal(adjacency.marker.kind, "shared-boundary");
+
+  const toiletAdjacency = groundFloorplanAnnotation(
+    assetId,
+    floorplanAnnotationFallbackForMessage("Is the ladies washroom next to the passage?")
+  );
+  assert.equal(toiletAdjacency.marker.kind, "shared-boundary");
 
   const transition = groundFloorplanAnnotation(assetId, {
     selections: [

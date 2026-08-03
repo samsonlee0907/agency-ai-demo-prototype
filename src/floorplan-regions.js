@@ -110,7 +110,14 @@ const meridianLevel12Catalog = {
       id: "toilets",
       label: "Toilets",
       type: "service",
-      description: "The complete western toilet block beside the passage.",
+      description: "The complete western block labelled Toilets beside the passage. The plan does not designate separate ladies or men's facilities.",
+      facts: {
+        genderDesignation: null,
+        enclosedCubicleCount: 5,
+        totalFixtureCount: null,
+        basinCount: null,
+        urinalCount: null
+      },
       polygon: [{ x: 35, y: 137 }, { x: 227, y: 137 }, { x: 227, y: 384 }, { x: 35, y: 384 }],
       labelAnchor: { x: 131, y: 261 }
     },
@@ -135,6 +142,10 @@ const meridianLevel12Catalog = {
     {
       regionIds: ["office_east_64_2", "restaurant"],
       boundary: [{ x: 699, y: 270 }, { x: 699, y: 520 }]
+    },
+    {
+      regionIds: ["toilets", "passage"],
+      boundary: [{ x: 224, y: 232 }, { x: 224, y: 384 }]
     }
   ]
 };
@@ -272,21 +283,60 @@ export function floorplanCatalogForModel(assetId) {
   return {
     id: catalog.id,
     assetId: catalog.assetId,
-    regions: catalog.regions.map(({ id, label, type, areaSqm = null, description }) => ({
+    regions: catalog.regions.map(({ id, label, type, areaSqm = null, description, facts = null }) => ({
       id,
       label,
       type,
       areaSqm,
-      description
+      description,
+      facts
     }))
   };
+}
+
+const wayfindingPattern = /\b(wayfinding|navigate|navigation|route|directions?|which way|show me the way)\b|\bhow (?:do|can) i get\b/;
+const regionMentionPatterns = [
+  ["reception", /\breception\b/],
+  ["restaurant", /\b(?:restaurant|dining)\b/],
+  ["central_stairs", /\bstairs?\b/],
+  ["toilets", /\b(?:toilets?|washrooms?|bathrooms?)\b/],
+  ["passage", /\bpassage\b/],
+  ["kitchen", /\bkitchen\b/],
+  ["verandah", /\bverandah\b/]
+];
+
+function mentionedRegionIds(normalized) {
+  return regionMentionPatterns
+    .map(([id, pattern]) => ({ id, index: normalized.search(pattern) }))
+    .filter(({ index }) => index >= 0)
+    .sort((left, right) => left.index - right.index)
+    .map(({ id }) => id);
 }
 
 export function floorplanAnnotationFallbackForMessage(message) {
   const normalized = String(message || "").toLowerCase();
   const select = (regionId, role, reason) => ({ regionId, role, reason });
-  if (/\b(how many|number of|count)\b/.test(normalized)
-    && /\b(toilets?|washrooms?|bathrooms?)\b/.test(normalized)) {
+  const regionIds = mentionedRegionIds(normalized);
+  const mentionsToilets = /\b(toilets?|washrooms?|bathrooms?|cubicles?|sinks?|basins?|urinals?|fixtures?)\b/.test(normalized);
+  const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
+  const asksForUnsupportedFixtureCount = asksForCount
+    && /\b(sinks?|basins?|urinals?|fixtures?)\b/.test(normalized);
+  if (mentionsToilets && /\b(?:next to|adjacent|adjoin(?:s|ing)?|beside)\b/.test(normalized)
+    && /\bpassage\b/.test(normalized)) {
+    return {
+      selections: [
+        select("toilets", "primary", "This is the toilet block referenced by the question."),
+        select("passage", "secondary", "This is the adjacent labelled passage.")
+      ],
+      relationship: {
+        type: "adjacency",
+        fromRegionId: "toilets",
+        toRegionId: "passage",
+        direction: null
+      }
+    };
+  }
+  if (mentionsToilets && asksForCount && !asksForUnsupportedFixtureCount) {
     return {
       selections: [select("toilets", "primary", "This is the washroom area referenced by the count question.")],
       relationship: {
@@ -297,7 +347,37 @@ export function floorplanAnnotationFallbackForMessage(message) {
       }
     };
   }
-  if (/\b(where|locate|find)\b/.test(normalized) && /\bstairs?\b/.test(normalized)) {
+  if (mentionsToilets && (asksForUnsupportedFixtureCount
+    || /\b(where|locate|find|ladies|women'?s?|female|men'?s?|male)\b/.test(normalized))) {
+    return {
+      selections: [
+        select("toilets", "primary", "This is the only block labelled Toilets on the plan."),
+        select("passage", "secondary", "This is the nearest validated spatial reference.")
+      ],
+      relationship: {
+        type: "location",
+        fromRegionId: "passage",
+        toRegionId: "toilets",
+        direction: null
+      }
+    };
+  }
+  if (/\brelative to\b/.test(normalized) && regionIds.length >= 2) {
+    const [targetRegionId, referenceRegionId] = regionIds;
+    return {
+      selections: [
+        select(targetRegionId, "primary", "This is the requested location."),
+        select(referenceRegionId, "secondary", "This is the requested spatial reference.")
+      ],
+      relationship: {
+        type: "direction",
+        fromRegionId: referenceRegionId,
+        toRegionId: targetRegionId,
+        direction: null
+      }
+    };
+  }
+  if (/\b(where|locate|find)\b/.test(normalized) && /\bstairs?\b/.test(normalized) && regionIds.length === 1) {
     return {
       selections: [
         select("central_stairs", "primary", "This is the requested central stair core."),
@@ -312,7 +392,71 @@ export function floorplanAnnotationFallbackForMessage(message) {
       }
     };
   }
+  if (wayfindingPattern.test(normalized)) {
+    if (regionIds.length >= 2) {
+      const [fromRegionId, toRegionId] = regionIds;
+      return {
+        selections: [
+          select(toRegionId, "primary", "This is the requested destination context."),
+          select(fromRegionId, "secondary", "This is the requested starting context.")
+        ],
+        relationship: {
+          type: "direction",
+          fromRegionId,
+          toRegionId,
+          direction: null
+        }
+      };
+    }
+    const [targetId] = regionIds;
+    const contextByTarget = {
+      reception: "restaurant",
+      restaurant: "reception",
+      central_stairs: "storage_west",
+      toilets: "passage",
+      passage: "toilets",
+      kitchen: "reception",
+      verandah: "restaurant"
+    };
+    const contextId = contextByTarget[targetId];
+    if (targetId && contextId) {
+      return {
+        selections: [
+          select(targetId, "primary", "This is the requested destination context."),
+          select(contextId, "secondary", "This is a nearby validated spatial reference.")
+        ],
+        relationship: {
+          type: "location",
+          fromRegionId: contextId,
+          toRegionId: targetId,
+          direction: null
+        }
+      };
+    }
+  }
   return null;
+}
+
+export function groundFloorplanReply(message, reply) {
+  const normalized = String(message || "").toLowerCase();
+  if (!/\b(toilets?|washrooms?|bathrooms?|cubicles?|sinks?|basins?|urinals?|fixtures?)\b/.test(normalized)) {
+    return reply;
+  }
+  const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
+  const genderCaveat = "The plan labels one general Toilets block and does not designate separate ladies or men's facilities.";
+  if (asksForCount && /\b(sinks?|basins?|urinals?|fixtures?)\b/.test(normalized)) {
+    return `${genderCaveat} It does not provide an authoritative count for those fixtures, so confirm them onsite.`;
+  }
+  if (asksForCount && /\b(toilets?|cubicles?)\b/.test(normalized)) {
+    return `${genderCaveat} The general block shows 5 enclosed cubicles; confirm the current facility designation onsite.`;
+  }
+  if (asksForCount && /\b(washrooms?|bathrooms?)\b/.test(normalized)) {
+    return `${genderCaveat} It therefore shows one labelled toilet area, not separate gendered washrooms.`;
+  }
+  if (/\b(where|locate|find|next to|adjacent|adjoin(?:s|ing)?|beside|ladies|women'?s?|female|men'?s?|male)\b/.test(normalized)) {
+    return `${genderCaveat} That block is immediately west of the labelled Passage; use onsite signage to confirm the appropriate facility.`;
+  }
+  return reply;
 }
 
 function toSourcePoint(point, catalog) {

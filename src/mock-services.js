@@ -6,7 +6,11 @@ import {
   findFloorplanForMessage,
   floorplanAnnotationRequested
 } from "./floorplan-assets.js";
-import { groundFloorplanAnnotation } from "./floorplan-regions.js";
+import {
+  floorplanAnnotationFallbackForMessage,
+  groundFloorplanAnnotation,
+  groundFloorplanReply
+} from "./floorplan-regions.js";
 import { esgPortfolio, findMaintenanceAsset } from "./operations-data.js";
 
 const priorityMap = new Map([
@@ -767,9 +771,16 @@ function answerTenantNonEmergency(building, normalized) {
   if (floorplan) {
     const floorplanGuide = findKnowledge(/floor plan|floorplan|layout/i);
     const floorplanAnswer = mockFloorplanAnswer(normalized);
-    const annotation = groundFloorplanAnnotation(floorplan.id, floorplanAnswer.annotation);
+    const fallbackIntent = floorplanAnnotationRequested(normalized)
+      ? floorplanAnnotationFallbackForMessage(normalized)
+      : null;
+    const intent = floorplanAnswer.annotation ?? fallbackIntent;
+    const annotation = groundFloorplanAnnotation(floorplan.id, intent);
+    const caption = floorplanAnswer.annotation || !annotation
+      ? floorplanAnswer.caption
+      : "Validated floorplan regions highlighted for spatial orientation only.";
     return {
-      reply: `${floorplanAnswer.reply} The static plan does not verify accessibility, obstructions or emergency routes; use posted signage and warden directions for those needs.`,
+      reply: `${groundFloorplanReply(normalized, floorplanAnswer.reply)} The static plan does not verify accessibility, obstructions or emergency routes; use posted signage and warden directions for those needs.`,
       category: "Building information",
       urgency: "Routine",
       recommendedAction: annotation
@@ -777,7 +788,7 @@ function answerTenantNonEmergency(building, normalized) {
         : "Open the attached original plan for orientation and confirm route questions with building management.",
       citations: [floorplanGuide?.title || floorplan.title],
       workOrder: { created: false, reference: "", summary: "No work order required", nextUpdate: "Not applicable" },
-      floorplan: buildFloorplanAttachment(floorplan, floorplanAnswer.caption, annotation),
+      floorplan: buildFloorplanAttachment(floorplan, caption, annotation),
       suggestions: ["I need help locating an amenity shown on the plan."]
     };
   }

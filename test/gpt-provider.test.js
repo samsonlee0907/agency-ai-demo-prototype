@@ -214,7 +214,14 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   assert.deepEqual(imageInput, { type: "input_image", image_url: dataUrl, detail: "original" });
   assert.equal(grounded.floorplan.imageUrl, floorplan.imageUrl);
   assert.equal(grounded.floorplan.title, floorplan.title);
-  assert.equal(grounded.floorplan.annotation.regions[0].label, "Restaurant");
+  assert.deepEqual(
+    grounded.floorplan.annotation.regions.map((region) => region.id).sort(),
+    ["central_stairs", "restaurant"]
+  );
+  assert.equal(
+    grounded.floorplan.annotation.regions.find((region) => region.id === "restaurant").label,
+    "Restaurant"
+  );
   assert.equal(grounded.floorplan.annotation.marker.kind, "direction-arrow");
   const modelInput = JSON.parse(requests[0].input[1].content[0].text);
   assert.equal(modelInput.floorplanCatalog.id, "meridian-house-level-12");
@@ -281,6 +288,49 @@ test("tenant floorplan grounding uses an authoritative fallback when visual inte
   );
   assert.deepEqual(grounded.floorplan.annotation.regions.map((region) => region.id), ["toilets"]);
   assert.equal(grounded.floorplan.annotation.relationship.type, "count");
+});
+
+test("tenant floorplan grounding prefers authoritative fallback selections", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const fallbackIntent = {
+    selections: [
+      { regionId: "toilets", role: "primary", reason: "This is the requested toilet block." },
+      { regionId: "passage", role: "secondary", reason: "This is the adjacent passage." }
+    ],
+    relationship: {
+      type: "adjacency",
+      fromRegionId: "toilets",
+      toRegionId: "passage",
+      direction: null
+    }
+  };
+  const grounded = groundTenantFloorplan(
+    assistantResponse({
+      included: true,
+      assetId: floorplan.id,
+      caption: "The toilet block and passage are highlighted.",
+      annotation: {
+        selections: [
+          { regionId: "toilets", role: "primary", reason: "This is the requested toilet block." },
+          { regionId: "restaurant", role: "secondary", reason: "This extra region was not requested." }
+        ],
+        relationship: {
+          type: "location",
+          fromRegionId: "toilets",
+          toRegionId: "restaurant",
+          direction: "northeast"
+        }
+      }
+    }),
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" },
+    true,
+    fallbackIntent
+  );
+  assert.deepEqual(grounded.floorplan.annotation.regions.map((region) => region.id), [
+    "toilets",
+    "passage"
+  ]);
+  assert.equal(grounded.floorplan.annotation.marker.kind, "shared-boundary");
 });
 
 test("tenant floorplan grounding rejects unknown model region identifiers", () => {
