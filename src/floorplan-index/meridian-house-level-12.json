@@ -13,6 +13,7 @@
       "id": "reception",
       "label": "Reception",
       "type": "room",
+      "prosePhrase": "Reception",
       "description": "The labelled reception room directly below the restaurant.",
       "polygon": [{ "x": 738, "y": 648 }, { "x": 850, "y": 648 }, { "x": 850, "y": 745 }, { "x": 738, "y": 745 }],
       "labelAnchor": { "x": 794, "y": 697 }

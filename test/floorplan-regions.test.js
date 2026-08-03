@@ -7,6 +7,7 @@ import {
   floorplanCatalogForModel,
   groundFloorplanAnnotation,
   groundFloorplanReply,
+  resolveFloorplanAnaphora,
   validateFloorplanRegionCatalog
 } from "../src/floorplan-regions.js";
 import { floorplanAnnotationRequested } from "../src/floorplan-assets.js";
@@ -175,7 +176,66 @@ test("toilet replies report the gendered facilities drawn on the plan", () => {
     "how to get to the male's washroom from the kitchen?",
     "Model supplied answer"
   );
-  assert.match(location, /Gents washroom is the western room of the Toilets block/);
+  assert.match(location, /The Gents washroom is northwest of the Kitchen on the Level 12 plan/);
+  assert.match(location, /not a confirmed walking route/);
+
+  const bare = groundFloorplanReply("where is the gents?", "Model supplied answer");
+  assert.match(bare, /Gents washroom is the western room of the Toilets block/);
+});
+
+test("a follow-up pronoun resolves to the region the conversation was about", () => {
+  const history = [
+    { role: "user", content: "where is the gents washroom?" },
+    { role: "assistant", content: "The Gents washroom is the western room of the Toilets block." }
+  ];
+
+  const resolved = resolveFloorplanAnaphora("how to reach it from the kitchen?", history);
+  assert.equal(resolved, "how to reach the gents washroom from the kitchen?");
+
+  const intent = floorplanAnnotationFallbackForMessage(resolved);
+  assert.deepEqual(intent.selections.map((item) => item.regionId), ["toilets_gents", "kitchen"]);
+  assert.equal(intent.relationship.type, "direction");
+  assert.equal(intent.relationship.fromRegionId, "kitchen");
+  assert.equal(intent.relationship.toRegionId, "toilets_gents");
+  assert.doesNotThrow(() => groundFloorplanAnnotation(assetId, intent));
+  assert.match(
+    groundFloorplanReply(resolved, "Model supplied answer"),
+    /The Gents washroom is northwest of the Kitchen/
+  );
+
+  assert.equal(
+    resolveFloorplanAnaphora("how many cubicles does it have?", history),
+    "how many cubicles does the gents washroom have?"
+  );
+  assert.equal(
+    resolveFloorplanAnaphora("how do i get there?", history),
+    "how do i get to the gents washroom?"
+  );
+
+  // A user turn wins over an assistant turn that mentions several regions.
+  assert.equal(
+    resolveFloorplanAnaphora("where is it?", [
+      { role: "user", content: "tell me about the kitchen" },
+      { role: "assistant", content: "The Kitchen sits below Reception, east of the Verandah." }
+    ]),
+    "where is the kitchen?"
+  );
+});
+
+test("anaphora resolution leaves unrelated wording alone", () => {
+  const history = [{ role: "user", content: "where is the gents washroom?" }];
+  // Existential "there" is not a reference to a region.
+  assert.equal(
+    resolveFloorplanAnaphora("how many urinals are there?", history),
+    "how many urinals are there?"
+  );
+  // Nothing to resolve against.
+  assert.equal(resolveFloorplanAnaphora("how do i get there?", []), "how do i get there?");
+  // The region is already named, so the pronoun cannot be the same region.
+  assert.equal(
+    resolveFloorplanAnaphora("is the gents washroom locked at night?", history),
+    "is the gents washroom locked at night?"
+  );
 });
 
 test("strict annotation schemas accept IDs and reject raw geometry", () => {
