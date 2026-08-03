@@ -48,11 +48,27 @@ test("model catalog exposes semantics without any renderer geometry", () => {
   assert.doesNotMatch(serialized, /polygon|labelAnchor|boundary|axis|coordinates/i);
   const toilets = modelCatalog.regions.find((region) => region.id === "toilets");
   assert.deepEqual(toilets.facts, {
-    genderDesignation: null,
+    genderDesignation: "separate gents and ladies washrooms",
     enclosedCubicleCount: 5,
-    totalFixtureCount: null,
-    basinCount: null,
-    urinalCount: null
+    totalFixtureCount: 15,
+    basinCount: 6,
+    urinalCount: 4
+  });
+  const ladies = modelCatalog.regions.find((region) => region.id === "toilets_ladies");
+  assert.deepEqual(ladies.facts, {
+    genderDesignation: "ladies",
+    enclosedCubicleCount: 3,
+    totalFixtureCount: 7,
+    basinCount: 4,
+    urinalCount: 0
+  });
+  const gents = modelCatalog.regions.find((region) => region.id === "toilets_gents");
+  assert.deepEqual(gents.facts, {
+    genderDesignation: "gents",
+    enclosedCubicleCount: 2,
+    totalFixtureCount: 8,
+    basinCount: 2,
+    urinalCount: 4
   });
 });
 
@@ -60,6 +76,9 @@ test("floorplan intent recognizes washroom and wayfinding wording without annota
   for (const message of [
     "How many cubicles are in the ladies washroom?",
     "Where is the men's washroom?",
+    "Where is the gents?",
+    "how to get to the male's washroom from the kitchen?",
+    "How do I get to the ladies room from reception?",
     "How do I get from reception to the restaurant?",
     "Show a route from the stairs to the restaurant.",
     "Navigate me from the toilets to reception."
@@ -67,22 +86,31 @@ test("floorplan intent recognizes washroom and wayfinding wording without annota
     assert.equal(floorplanAnnotationRequested(message), true, message);
   }
   assert.equal(floorplanAnnotationRequested("Show me the Level 12 floor plan"), false);
+  assert.equal(floorplanAnnotationRequested("Can I see the floorplan?"), false);
 });
 
 test("toilet and wayfinding questions have authoritative fallback intents", () => {
   const scenarios = [
-    ["how many toilets does the ladies washroom have?", ["toilets"], "count"],
-    ["How many cubicles are in the ladies washroom?", ["toilets"], "count"],
-    ["How many sinks are in the ladies washroom?", ["toilets", "passage"], "location"],
-    ["How many urinals are shown?", ["toilets", "passage"], "location"],
-    ["Where is the men's washroom?", ["toilets", "passage"], "location"],
-    ["Is the ladies washroom next to the passage?", ["toilets", "passage"], "adjacency"],
+    ["how many toilets does the ladies washroom have?", ["toilets_ladies"], "count"],
+    ["How many cubicles are in the ladies washroom?", ["toilets_ladies"], "count"],
+    ["How many sinks are in the ladies washroom?", ["toilets_ladies"], "count"],
+    ["How many urinals are shown?", ["toilets"], "count"],
+    ["How many urinals are in the gents?", ["toilets_gents"], "count"],
+    ["Where is the men's washroom?", ["toilets_gents", "toilets_ladies"], "location"],
+    ["Where is the ladies washroom?", ["toilets_ladies", "passage"], "location"],
+    ["Is the ladies washroom next to the passage?", ["toilets_ladies", "passage"], "adjacency"],
     ["Where's the stairs?", ["central_stairs", "storage_west", "storage_east"], "location"],
+    ["Where is the gents?", ["toilets_gents", "toilets_ladies"], "location"],
+    ["Where is the kitchen?", ["kitchen", "reception"], "location"],
+    ["How many fixtures are in the toilets?", ["toilets"], "count"],
+    ["How do I get to the ladies room from reception?", ["toilets_ladies", "reception"], "direction"],
     ["Where is the restaurant relative to the central stairs?", ["restaurant", "central_stairs"], "direction"],
     ["How do I get from reception to the restaurant?", ["restaurant", "reception"], "direction"],
+    ["how to get to the male's washroom from the kitchen?", ["toilets_gents", "kitchen"], "direction"],
     ["Navigate me from the toilets to reception.", ["reception", "toilets"], "direction"],
     ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"], "direction"],
-    ["How do I get to the toilets?", ["toilets", "passage"], "location"]
+    ["How do I get to the toilets?", ["toilets", "passage"], "location"],
+    ["How do I get to the ladies washroom?", ["toilets_ladies", "passage"], "location"]
   ];
   for (const [message, regionIds, relationship] of scenarios) {
     const intent = floorplanAnnotationFallbackForMessage(message);
@@ -94,26 +122,43 @@ test("toilet and wayfinding questions have authoritative fallback intents", () =
   assert.equal(floorplanAnnotationFallbackForMessage("Where is the nearest lift?"), null);
 });
 
-test("toilet replies preserve verified cubicle evidence and facility uncertainty", () => {
+test("toilet replies report the gendered facilities drawn on the plan", () => {
   const cubicles = groundFloorplanReply(
     "How many cubicles are in the ladies washroom?",
     "Model supplied answer"
   );
-  assert.match(cubicles, /5 enclosed cubicles/);
-  assert.match(cubicles, /does not designate separate ladies or men's facilities/);
+  assert.match(cubicles, /Ladies washroom shows 3 enclosed toilet cubicles/);
+  assert.doesNotMatch(cubicles, /does not designate/);
+
+  const gents = groundFloorplanReply(
+    "How many toilets are in the gents?",
+    "Model supplied answer"
+  );
+  assert.match(gents, /Gents washroom shows 2 enclosed toilet cubicles/);
+  assert.match(gents, /4 urinals/);
 
   const sinks = groundFloorplanReply(
     "How many sinks are in the ladies washroom?",
     "Model supplied answer"
   );
-  assert.match(sinks, /does not provide an authoritative count/);
-  assert.doesNotMatch(sinks, /\b5\b/);
+  assert.match(sinks, /Ladies washroom shows 4 wash basins/);
+
+  const urinals = groundFloorplanReply("How many urinals are shown?", "Model supplied answer");
+  assert.match(urinals, /Toilets block shows 4 urinals/);
 
   const washrooms = groundFloorplanReply(
     "How many washrooms are shown on Level 12?",
     "Model supplied answer"
   );
-  assert.match(washrooms, /one labelled toilet area/);
+  assert.match(washrooms, /two washrooms/);
+  assert.match(washrooms, /Gents washroom with 2 enclosed cubicles/);
+  assert.match(washrooms, /Ladies washroom with 3 enclosed cubicles/);
+
+  const location = groundFloorplanReply(
+    "how to get to the male's washroom from the kitchen?",
+    "Model supplied answer"
+  );
+  assert.match(location, /Gents washroom is at the far western end/);
 });
 
 test("strict annotation schemas accept IDs and reject raw geometry", () => {

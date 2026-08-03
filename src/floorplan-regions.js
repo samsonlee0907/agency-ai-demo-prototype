@@ -11,6 +11,8 @@ export const FLOORPLAN_REGION_IDS = Object.freeze([
   "storage_west",
   "storage_east",
   "toilets",
+  "toilets_gents",
+  "toilets_ladies",
   "passage",
   "kitchen"
 ]);
@@ -110,16 +112,46 @@ const meridianLevel12Catalog = {
       id: "toilets",
       label: "Toilets",
       type: "service",
-      description: "The complete western block labelled Toilets beside the passage. The plan does not designate separate ladies or men's facilities.",
+      description: "The complete western block labelled Toilets beside the passage. It contains the labelled Gents washroom at its western end and the labelled Ladies washroom to the east of the Gents.",
       facts: {
-        genderDesignation: null,
+        genderDesignation: "separate gents and ladies washrooms",
         enclosedCubicleCount: 5,
-        totalFixtureCount: null,
-        basinCount: null,
-        urinalCount: null
+        totalFixtureCount: 15,
+        basinCount: 6,
+        urinalCount: 4
       },
       polygon: [{ x: 35, y: 137 }, { x: 227, y: 137 }, { x: 227, y: 384 }, { x: 35, y: 384 }],
       labelAnchor: { x: 131, y: 261 }
+    },
+    {
+      id: "toilets_gents",
+      label: "Gents washroom",
+      type: "service",
+      description: "The labelled Gents washroom at the western end of the Toilets block, beyond the Ladies washroom.",
+      facts: {
+        genderDesignation: "gents",
+        enclosedCubicleCount: 2,
+        totalFixtureCount: 8,
+        basinCount: 2,
+        urinalCount: 4
+      },
+      polygon: [{ x: 39, y: 147 }, { x: 114, y: 147 }, { x: 114, y: 376 }, { x: 39, y: 376 }],
+      labelAnchor: { x: 76, y: 261 }
+    },
+    {
+      id: "toilets_ladies",
+      label: "Ladies washroom",
+      type: "service",
+      description: "The labelled Ladies washroom in the eastern half of the Toilets block, immediately west of the passage.",
+      facts: {
+        genderDesignation: "ladies",
+        enclosedCubicleCount: 3,
+        totalFixtureCount: 7,
+        basinCount: 4,
+        urinalCount: 0
+      },
+      polygon: [{ x: 119, y: 147 }, { x: 218, y: 147 }, { x: 218, y: 307 }, { x: 119, y: 307 }],
+      labelAnchor: { x: 168, y: 227 }
     },
     {
       id: "passage",
@@ -146,6 +178,14 @@ const meridianLevel12Catalog = {
     {
       regionIds: ["toilets", "passage"],
       boundary: [{ x: 224, y: 232 }, { x: 224, y: 384 }]
+    },
+    {
+      regionIds: ["toilets_ladies", "passage"],
+      boundary: [{ x: 219, y: 232 }, { x: 219, y: 307 }]
+    },
+    {
+      regionIds: ["toilets_gents", "toilets_ladies"],
+      boundary: [{ x: 116, y: 147 }, { x: 116, y: 307 }]
     }
   ]
 };
@@ -294,51 +334,117 @@ export function floorplanCatalogForModel(assetId) {
   };
 }
 
-const wayfindingPattern = /\b(wayfinding|navigate|navigation|route|directions?|which way|show me the way)\b|\bhow (?:do|can) i get\b/;
+const wayfindingPattern = /\b(wayfinding|navigate|navigation|route|directions?|which way|show me the way)\b|\bhow (?:do|can|would|should) i get\b|\bhow to (?:get|reach|find)\b|\bget (?:to|from)\b|\bway (?:to|from)\b/;
+const ladiesPattern = /\b(?:ladies|lady'?s?|women'?s?|woman'?s?|female|girls)\b/;
+const gentsPattern = /\b(?:gents?'?s?|men'?s?|male'?s?|males|boys)\b/;
+const contextByTarget = {
+  reception: "restaurant",
+  restaurant: "reception",
+  central_stairs: "storage_west",
+  storage_west: "central_stairs",
+  storage_east: "central_stairs",
+  office_west_64_2: "office_east_64_2",
+  office_east_64_2: "restaurant",
+  office_114_4: "verandah",
+  toilets: "passage",
+  toilets_ladies: "passage",
+  toilets_gents: "toilets_ladies",
+  passage: "toilets",
+  kitchen: "reception",
+  verandah: "restaurant"
+};
+const toiletMentionPattern = /\b(?:toilets?|washrooms?|bathrooms?|restrooms?|cubicles?|sinks?|basins?|urinals?|fixtures?|wc|loos?|lavator(?:y|ies)|gents?|gent'?s|ladies|lady'?s|powder\s+room)\b/;
 const regionMentionPatterns = [
   ["reception", /\breception\b/],
   ["restaurant", /\b(?:restaurant|dining)\b/],
   ["central_stairs", /\bstairs?\b/],
-  ["toilets", /\b(?:toilets?|washrooms?|bathrooms?)\b/],
+  ["toilets", toiletMentionPattern],
   ["passage", /\bpassage\b/],
   ["kitchen", /\bkitchen\b/],
   ["verandah", /\bverandah\b/]
 ];
 
+// The plan labels a Gents and a Ladies washroom inside the Toilets block, so gendered
+// wording must resolve to the specific room rather than the whole block.
+function resolveToiletRegionId(normalized) {
+  const ladiesIndex = normalized.search(ladiesPattern);
+  const gentsIndex = normalized.search(gentsPattern);
+  if (ladiesIndex >= 0 && (gentsIndex < 0 || ladiesIndex < gentsIndex)) return "toilets_ladies";
+  if (gentsIndex >= 0) return "toilets_gents";
+  return "toilets";
+}
+
 function mentionedRegionIds(normalized) {
+  const toiletRegionId = resolveToiletRegionId(normalized);
   return regionMentionPatterns
-    .map(([id, pattern]) => ({ id, index: normalized.search(pattern) }))
+    .map(([id, pattern]) => ({
+      id: id === "toilets" ? toiletRegionId : id,
+      index: normalized.search(pattern)
+    }))
     .filter(({ index }) => index >= 0)
     .sort((left, right) => left.index - right.index)
     .map(({ id }) => id);
 }
 
+// "get to X from Y" states the destination first, "from Y to X" states it last.
+function wayfindingEndpoints(normalized, regionIds) {
+  const [first, second] = regionIds;
+  const fromIndex = normalized.search(/\bfrom\b/);
+  const toIndex = normalized.search(/\b(?:to|towards|into)\b/);
+  if (fromIndex >= 0 && toIndex >= 0 && toIndex < fromIndex) {
+    return { fromRegionId: second, toRegionId: first };
+  }
+  return { fromRegionId: first, toRegionId: second };
+}
+
+const toiletFacilityFacts = Object.freeze({
+  toilets_ladies: { label: "Ladies washroom", cubicles: 3, basins: 4, urinals: 0 },
+  toilets_gents: { label: "Gents washroom", cubicles: 2, basins: 2, urinals: 4 },
+  toilets: { label: "Toilets block", cubicles: 5, basins: 6, urinals: 4 }
+});
+
+const toiletCompositionNote = "The Toilets block holds a Gents washroom at its western end and a Ladies washroom to the east of it.";
+
 export function floorplanAnnotationFallbackForMessage(message) {
   const normalized = String(message || "").toLowerCase();
   const select = (regionId, role, reason) => ({ regionId, role, reason });
   const regionIds = mentionedRegionIds(normalized);
-  const mentionsToilets = /\b(toilets?|washrooms?|bathrooms?|cubicles?|sinks?|basins?|urinals?|fixtures?)\b/.test(normalized);
+  const mentionsToilets = toiletMentionPattern.test(normalized);
+  const toiletRegionId = resolveToiletRegionId(normalized);
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
-  const asksForUnsupportedFixtureCount = asksForCount
-    && /\b(sinks?|basins?|urinals?|fixtures?)\b/.test(normalized);
-  if (mentionsToilets && /\b(?:next to|adjacent|adjoin(?:s|ing)?|beside)\b/.test(normalized)
-    && /\bpassage\b/.test(normalized)) {
+  if (wayfindingPattern.test(normalized) && regionIds.length >= 2) {
+    const { fromRegionId, toRegionId } = wayfindingEndpoints(normalized, regionIds);
     return {
       selections: [
-        select("toilets", "primary", "This is the toilet block referenced by the question."),
+        select(toRegionId, "primary", "This is the requested destination context."),
+        select(fromRegionId, "secondary", "This is the requested starting context.")
+      ],
+      relationship: {
+        type: "direction",
+        fromRegionId,
+        toRegionId,
+        direction: null
+      }
+    };
+  }
+  if (mentionsToilets && /\b(?:next to|adjacent|adjoin(?:s|ing)?|beside)\b/.test(normalized)
+    && /\bpassage\b/.test(normalized) && toiletRegionId !== "toilets_gents") {
+    return {
+      selections: [
+        select(toiletRegionId, "primary", "This is the washroom area referenced by the question."),
         select("passage", "secondary", "This is the adjacent labelled passage.")
       ],
       relationship: {
         type: "adjacency",
-        fromRegionId: "toilets",
+        fromRegionId: toiletRegionId,
         toRegionId: "passage",
         direction: null
       }
     };
   }
-  if (mentionsToilets && asksForCount && !asksForUnsupportedFixtureCount) {
+  if (mentionsToilets && asksForCount) {
     return {
-      selections: [select("toilets", "primary", "This is the washroom area referenced by the count question.")],
+      selections: [select(toiletRegionId, "primary", "This is the washroom area referenced by the count question.")],
       relationship: {
         type: "count",
         fromRegionId: null,
@@ -347,17 +453,19 @@ export function floorplanAnnotationFallbackForMessage(message) {
       }
     };
   }
-  if (mentionsToilets && (asksForUnsupportedFixtureCount
-    || /\b(where|locate|find|ladies|women'?s?|female|men'?s?|male)\b/.test(normalized))) {
+  if (mentionsToilets && (toiletRegionId !== "toilets"
+    || /\b(where|locate|find|nearest|closest)\b/.test(normalized)
+    || wayfindingPattern.test(normalized))) {
+    const referenceRegionId = toiletRegionId === "toilets_gents" ? "toilets_ladies" : "passage";
     return {
       selections: [
-        select("toilets", "primary", "This is the only block labelled Toilets on the plan."),
-        select("passage", "secondary", "This is the nearest validated spatial reference.")
+        select(toiletRegionId, "primary", "This is the washroom area referenced by the question."),
+        select(referenceRegionId, "secondary", "This is the nearest validated spatial reference.")
       ],
       relationship: {
         type: "location",
-        fromRegionId: "passage",
-        toRegionId: "toilets",
+        fromRegionId: referenceRegionId,
+        toRegionId: toiletRegionId,
         direction: null
       }
     };
@@ -392,32 +500,8 @@ export function floorplanAnnotationFallbackForMessage(message) {
       }
     };
   }
-  if (wayfindingPattern.test(normalized)) {
-    if (regionIds.length >= 2) {
-      const [fromRegionId, toRegionId] = regionIds;
-      return {
-        selections: [
-          select(toRegionId, "primary", "This is the requested destination context."),
-          select(fromRegionId, "secondary", "This is the requested starting context.")
-        ],
-        relationship: {
-          type: "direction",
-          fromRegionId,
-          toRegionId,
-          direction: null
-        }
-      };
-    }
+  if (wayfindingPattern.test(normalized) || /\b(where|locate|find|nearest|closest)\b/.test(normalized)) {
     const [targetId] = regionIds;
-    const contextByTarget = {
-      reception: "restaurant",
-      restaurant: "reception",
-      central_stairs: "storage_west",
-      toilets: "passage",
-      passage: "toilets",
-      kitchen: "reception",
-      verandah: "restaurant"
-    };
     const contextId = contextByTarget[targetId];
     if (targetId && contextId) {
       return {
@@ -439,22 +523,38 @@ export function floorplanAnnotationFallbackForMessage(message) {
 
 export function groundFloorplanReply(message, reply) {
   const normalized = String(message || "").toLowerCase();
-  if (!/\b(toilets?|washrooms?|bathrooms?|cubicles?|sinks?|basins?|urinals?|fixtures?)\b/.test(normalized)) {
-    return reply;
-  }
+  if (!toiletMentionPattern.test(normalized)) return reply;
+  const regionId = resolveToiletRegionId(normalized);
+  const facts = toiletFacilityFacts[regionId];
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
-  const genderCaveat = "The plan labels one general Toilets block and does not designate separate ladies or men's facilities.";
-  if (asksForCount && /\b(sinks?|basins?|urinals?|fixtures?)\b/.test(normalized)) {
-    return `${genderCaveat} It does not provide an authoritative count for those fixtures, so confirm them onsite.`;
+  if (asksForCount && /\burinals?\b/.test(normalized)) {
+    return facts.urinals > 0
+      ? `The ${facts.label} shows ${facts.urinals} urinals. ${toiletCompositionNote}`
+      : `The ${facts.label} shows no urinals; the plan draws all 4 urinals in the Gents washroom.`;
   }
-  if (asksForCount && /\b(toilets?|cubicles?)\b/.test(normalized)) {
-    return `${genderCaveat} The general block shows 5 enclosed cubicles; confirm the current facility designation onsite.`;
+  if (asksForCount && /\b(sinks?|basins?)\b/.test(normalized)) {
+    return `The ${facts.label} shows ${facts.basins} wash basins. ${toiletCompositionNote}`;
   }
-  if (asksForCount && /\b(washrooms?|bathrooms?)\b/.test(normalized)) {
-    return `${genderCaveat} It therefore shows one labelled toilet area, not separate gendered washrooms.`;
+  if (asksForCount && /\bfixtures?\b/.test(normalized)) {
+    const total = facts.cubicles + facts.basins + facts.urinals;
+    return `The ${facts.label} shows ${total} plumbing fixtures: ${facts.cubicles} enclosed cubicles, ${facts.basins} wash basins and ${facts.urinals} urinals.`;
   }
-  if (/\b(where|locate|find|next to|adjacent|adjoin(?:s|ing)?|beside|ladies|women'?s?|female|men'?s?|male)\b/.test(normalized)) {
-    return `${genderCaveat} That block is immediately west of the labelled Passage; use onsite signage to confirm the appropriate facility.`;
+  if (asksForCount && regionId === "toilets" && /\b(washrooms?|bathrooms?|restrooms?)\b/.test(normalized)) {
+    return `Level 12 has one labelled Toilets block containing two washrooms: the Gents washroom with 2 enclosed cubicles, 4 urinals and 2 basins, and the Ladies washroom with 3 enclosed cubicles and 4 basins.`;
+  }
+  if (asksForCount) {
+    const urinalNote = facts.urinals > 0 ? `, plus ${facts.urinals} urinals` : "";
+    return `The ${facts.label} shows ${facts.cubicles} enclosed toilet cubicles${urinalNote}. ${toiletCompositionNote}`;
+  }
+  if (/\b(where|locate|find|next to|adjacent|adjoin(?:s|ing)?|beside|nearest|closest)\b/.test(normalized)
+    || wayfindingPattern.test(normalized)) {
+    if (regionId === "toilets_ladies") {
+      return `The Ladies washroom is the eastern half of the Toilets block on the west side of Level 12, immediately west of the labelled Passage.`;
+    }
+    if (regionId === "toilets_gents") {
+      return `The Gents washroom is at the far western end of the Toilets block, beyond the Ladies washroom and west of the labelled Passage.`;
+    }
+    return `The Toilets block sits immediately west of the labelled Passage. ${toiletCompositionNote}`;
   }
   return reply;
 }
