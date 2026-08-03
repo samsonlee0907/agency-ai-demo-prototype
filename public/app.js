@@ -328,6 +328,7 @@ function renderAssistantBuilding() {
     <dl><div><dt>Service desk</dt><dd>${escapeHtml(building.serviceHours)}</dd></div><div><dt>Urgent support</dt><dd>${escapeHtml(building.emergencyContact)}</dd></div></dl>
   `;
   $("#assistant-chat-context").textContent = `${building.name} · 24/7 support`;
+  $("#assistant-floorplan-starter").hidden = !building.floorplans?.length;
   state.assistantHistory = [{
     role: "assistant",
     content: `Welcome to ${building.name}. I can answer building questions, explain tenant services and help log a maintenance request. How can I help?`
@@ -342,12 +343,113 @@ function renderAssistantBuildingSelect() {
   renderAssistantBuilding();
 }
 
+function floorplanPoint(point) {
+  const x = Number(point?.x);
+  const y = Number(point?.y);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
+function floorplanPoints(points) {
+  return (points || [])
+    .map(floorplanPoint)
+    .filter(Boolean)
+    .map(({ x, y }) => `${x},${y}`)
+    .join(" ");
+}
+
+function renderFloorplanMarker(annotation, markerId) {
+  const marker = annotation.marker;
+  const points = marker?.points?.map(floorplanPoint).filter(Boolean) || [];
+  if (points.length !== 2) return "";
+  const [start, end] = points;
+  if (marker.kind === "shared-boundary") {
+    return `<line class="floorplan-relationship is-boundary" x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" vector-effect="non-scaling-stroke"></line>`;
+  }
+  return `
+    <defs>
+      <marker id="${markerId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M 0 0 L 10 5 L 0 10 z"></path>
+      </marker>
+    </defs>
+    <line class="floorplan-relationship ${marker.kind === "axis-arrow" ? "is-axis" : "is-direction"}" x1="${start.x}" y1="${start.y}" x2="${end.x}" y2="${end.y}" marker-end="url(#${markerId})" vector-effect="non-scaling-stroke"></line>
+  `;
+}
+
+function renderFloorplanCard(floorplan, messageIndex) {
+  const annotation = floorplan.annotation;
+  const cardId = `assistant-floorplan-${messageIndex}`;
+  if (!annotation) {
+    return `
+      <figure class="assistant-floorplan-card">
+        <a class="floorplan-plain-image" href="${escapeHtml(floorplan.imageUrl)}" target="_blank" rel="noopener">
+          <img src="${escapeHtml(floorplan.imageUrl)}" alt="${escapeHtml(floorplan.alt)}" loading="lazy">
+        </a>
+        <figcaption>
+          <span>${escapeHtml(floorplan.floor)}</span>
+          <strong>${escapeHtml(floorplan.title)}</strong>
+          <p>${escapeHtml(floorplan.caption)}</p>
+          <div><a href="${escapeHtml(floorplan.imageUrl)}" target="_blank" rel="noopener">Open full size</a><a href="${escapeHtml(floorplan.imageUrl)}" download>Download image</a></div>
+        </figcaption>
+      </figure>
+    `;
+  }
+
+  const markerId = `${cardId}-arrow`;
+  const titleId = `${cardId}-title`;
+  const descriptionId = `${cardId}-description`;
+  const regionSummary = annotation.regions.map((region) => `${region.label}: ${region.reason}`).join(" ");
+  const regions = annotation.regions.map((region) => {
+    const role = ["primary", "secondary", "context"].includes(region.role) ? region.role : "context";
+    const anchor = floorplanPoint(region.labelAnchor);
+    return `
+      <g class="floorplan-region-group role-${role}">
+        <polygon points="${floorplanPoints(region.polygon)}" vector-effect="non-scaling-stroke"></polygon>
+        ${anchor ? `<text x="${anchor.x}" y="${anchor.y}" text-anchor="middle" dominant-baseline="middle">${escapeHtml(region.label)}</text>` : ""}
+      </g>
+    `;
+  }).join("");
+  const legend = annotation.regions.map((region) => `
+    <li>
+      <span class="floorplan-legend-swatch role-${escapeHtml(region.role)}" aria-hidden="true"></span>
+      <span><strong>${escapeHtml(region.label)}</strong><small>${escapeHtml(region.role)} · ${escapeHtml(region.reason)}</small></span>
+    </li>
+  `).join("");
+
+  return `
+    <figure class="assistant-floorplan-card has-annotation" id="${cardId}">
+      <div class="floorplan-toolbar">
+        <span>Question-specific overlay</span>
+        <button type="button" data-floorplan-toggle="${cardId}" aria-pressed="false">View original plan</button>
+      </div>
+      <div class="floorplan-visual">
+        <img src="${escapeHtml(floorplan.imageUrl)}" alt="${escapeHtml(floorplan.alt)}" loading="lazy">
+        <svg viewBox="0 0 ${annotation.width} ${annotation.height}" role="img" aria-labelledby="${titleId} ${descriptionId}" preserveAspectRatio="xMidYMid meet">
+          <title id="${titleId}">${escapeHtml(floorplan.title)} question-specific annotation</title>
+          <desc id="${descriptionId}">${escapeHtml(annotation.relationship.label)}. ${escapeHtml(regionSummary)} ${escapeHtml(annotation.safetyNote)}</desc>
+          ${regions}
+          ${renderFloorplanMarker(annotation, markerId)}
+        </svg>
+      </div>
+      <figcaption>
+        <span>${escapeHtml(floorplan.floor)}</span>
+        <strong>${escapeHtml(floorplan.title)}</strong>
+        <p>${escapeHtml(floorplan.caption)}</p>
+        <div class="floorplan-relationship-summary"><strong>Relationship</strong><span>${escapeHtml(annotation.relationship.label)}</span></div>
+        <ul class="floorplan-legend" aria-label="Highlighted floorplan regions">${legend}</ul>
+        <p class="floorplan-safety-note">${escapeHtml(annotation.safetyNote)}</p>
+        <div><a href="${escapeHtml(floorplan.imageUrl)}" target="_blank" rel="noopener">Open full size</a><a href="${escapeHtml(floorplan.imageUrl)}" download>Download image</a></div>
+      </figcaption>
+    </figure>
+  `;
+}
+
 function renderAssistantMessages() {
   const container = $("#chat-messages");
-  container.innerHTML = state.assistantHistory.map((message) => {
+  container.innerHTML = state.assistantHistory.map((message, messageIndex) => {
     const response = message.response;
-    const followUpQuestions = response?.suggestions.filter((suggestion) => suggestion.trim().endsWith("?")) || [];
-    const tenantConfirmations = response?.suggestions.filter((suggestion) => !suggestion.trim().endsWith("?")) || [];
+    const followUpQuestions = response?.suggestions?.filter((suggestion) => suggestion.trim().endsWith("?")) || [];
+    const tenantConfirmations = response?.suggestions?.filter((suggestion) => !suggestion.trim().endsWith("?")) || [];
+    const floorplan = response?.floorplan?.included ? response.floorplan : null;
     return `
       <article class="chat-message ${message.role === "user" ? "is-user" : "is-assistant"}">
         <span class="chat-speaker">${message.role === "user" ? "You" : "Aurelia"}</span>
@@ -364,6 +466,7 @@ function renderAssistantMessages() {
                 <p>${escapeHtml(response.workOrder.summary)}</p><small>${escapeHtml(response.workOrder.nextUpdate)}</small>
               </div>
             ` : ""}
+            ${floorplan ? renderFloorplanCard(floorplan, messageIndex) : ""}
             <p class="assistant-action"><strong>Next step</strong>${escapeHtml(response.recommendedAction)}</p>
             <div class="assistant-citations"><span>Sources</span>${response.citations.map((citation) => `<i>${escapeHtml(citation)}</i>`).join("")}</div>
             ${followUpQuestions.length ? `<div class="assistant-questions"><span>Aurelia asks</span>${followUpQuestions.map((question) => `<p>${escapeHtml(question)}</p>`).join("")}</div>` : ""}
@@ -1181,6 +1284,15 @@ function wireEvents() {
     invalidateGeneratedOutput("#esg-output", "Sustainability draft");
   });
   $(".assistant-workspace").addEventListener("click", (event) => {
+    const floorplanToggle = event.target.closest("[data-floorplan-toggle]");
+    if (floorplanToggle) {
+      const card = document.getElementById(floorplanToggle.dataset.floorplanToggle);
+      if (!card) return;
+      const showingOriginal = card.classList.toggle("show-original");
+      floorplanToggle.setAttribute("aria-pressed", String(showingOriginal));
+      floorplanToggle.textContent = showingOriginal ? "View annotated plan" : "View original plan";
+      return;
+    }
     const prompt = event.target.closest("[data-assistant-prompt]")?.dataset.assistantPrompt;
     if (!prompt || state.assistantPending) return;
     const composer = $("#assistant-message");

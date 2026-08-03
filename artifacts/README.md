@@ -3,7 +3,8 @@
 The runtime artifacts are committed under `public/assets/` so a clean clone can run every mock scenario without external storage:
 
 - six fictional MAI-generated property images in `public/assets/properties/`;
-- one deterministic 25-page fictional lease PDF in `public/assets/documents/`.
+- one deterministic 25-page fictional lease PDF in `public/assets/documents/`;
+- one user-provided neutral floorplan assigned to fictional Meridian House Level 12 in `public/assets/floorplans/`.
 
 `demo-assets.json` records each file's byte length, SHA-256 digest, source, and generator. Verify the checked-in files with:
 

@@ -73,6 +73,53 @@ test("tenant assistant triages maintenance and creates a grounded work order", (
   assert.equal(result.urgency, "Priority");
   assert.equal(result.workOrder.created, true);
   assert.match(result.recommendedAction, /electrics/i);
+  assert.equal(result.floorplan.included, false);
+});
+
+test("tenant assistant attaches only the approved floorplan to relevant Meridian questions", () => {
+  const result = answerTenant("building-meridian", "Where are the toilets on the Level 12 floor plan?");
+  assert.equal(result.category, "Building information");
+  assert.equal(result.floorplan.included, true);
+  assert.equal(result.floorplan.assetId, "floorplan-meridian-level-12");
+  assert.match(result.reply, /static plan|posted building signage/i);
+
+  const unrelated = answerTenant("building-meridian", "What are the concierge hours?");
+  assert.equal(unrelated.floorplan.included, false);
+  const otherBuilding = answerTenant("building-arcade", "Show me the floor plan");
+  assert.equal(otherBuilding.floorplan.included, false);
+});
+
+test("tenant assistant Mock mode returns question-specific grounded annotations", () => {
+  const location = answerTenant("building-meridian", "Where is the restaurant relative to the central stairs?");
+  assert.equal(location.floorplan.annotation.relationship.type, "location");
+  assert.equal(location.floorplan.annotation.marker.kind, "direction-arrow");
+  assert.deepEqual(location.floorplan.annotation.regions.map((region) => region.id), ["restaurant", "central_stairs"]);
+  assert.ok(location.floorplan.annotation.regions.every((region) => region.polygon.length >= 3));
+
+  const adjacency = answerTenant("building-meridian", "Which 64.2 m² office is closer to the restaurant because it is adjacent?");
+  assert.equal(adjacency.floorplan.annotation.relationship.type, "adjacency");
+  assert.equal(adjacency.floorplan.annotation.marker.kind, "shared-boundary");
+
+  const transition = answerTenant("building-meridian", "Which verandah transition runs toward the restaurant?");
+  assert.equal(transition.floorplan.annotation.marker.kind, "axis-arrow");
+  assert.match(transition.floorplan.annotation.relationship.label, /not a route/);
+});
+
+test("tenant assistant Mock mode annotates count and size evidence deterministically", () => {
+  const count = answerTenant("building-meridian", "How many separately labelled office spaces are shown?");
+  const size = answerTenant("building-meridian", "Which labelled office is the largest?");
+  assert.equal(count.floorplan.annotation.relationship.type, "count");
+  assert.equal(count.floorplan.annotation.regions.filter((region) => region.role === "primary").length, 3);
+  assert.equal(size.floorplan.annotation.relationship.type, "size");
+  assert.equal(size.floorplan.annotation.regions[0].id, "office_114_4");
+  assert.equal(size.floorplan.annotation.regions[0].areaSqm, 114.4);
+});
+
+test("tenant assistant uses the plain plan when no validated region confidently matches", () => {
+  const broad = answerTenant("building-meridian", "Show me the Level 12 floor plan and main amenities");
+  assert.equal(broad.floorplan.included, true);
+  assert.equal(broad.floorplan.annotation, null);
+  assert.match(broad.reply, /without a highlight/i);
 });
 
 test("tenant assistant suggestions are ready-to-send tenant confirmations", () => {

@@ -3,13 +3,17 @@ import assert from "node:assert/strict";
 import { findMaintenanceAsset } from "../src/operations-data.js";
 import { analyseMaintenance, buildEsgEvidence } from "../src/mock-services.js";
 import {
+  createGptProvider,
   ensureEmergencyGuidance,
   groundEsgReport,
   groundMaintenanceAnalysis,
+  groundTenantFloorplan,
   groundValuationComparables,
   ModelResponseError,
   normalizeAssistantFollowUps
 } from "../src/providers/gpt.js";
+import { findBuilding } from "../src/data.js";
+import { findFloorplanAsset } from "../src/floorplan-assets.js";
 import { ASSISTANT_REPLY_MAX_LENGTH, assistantOutputSchema } from "../src/schemas.js";
 
 const sources = [
@@ -17,6 +21,24 @@ const sources = [
   { id: "comp-two", address: "2 Sample Street", area: "Sydney", saleDate: "2 Jul 2026", salePrice: 1100000 },
   { id: "comp-three", address: "3 Sample Street", area: "Sydney", saleDate: "3 Jul 2026", salePrice: 1200000 }
 ];
+
+function assistantResponse(floorplan = {
+  included: false,
+  assetId: "",
+  caption: "",
+  annotation: null
+}) {
+  return {
+    reply: "Here is a grounded response based on the supplied building information.",
+    category: "Building information",
+    urgency: "Routine",
+    recommendedAction: "Review the supplied building information.",
+    citations: ["Meridian House Level 12 floor plan"],
+    workOrder: { created: false, reference: "", summary: "No work order required", nextUpdate: "Not applicable" },
+    floorplan,
+    suggestions: []
+  };
+}
 
 function comparable(id) {
   return {
@@ -116,6 +138,16 @@ test("emergency assistant responses always include safe 000 guidance", () => {
     recommendedAction: "Keep clear of the affected area.",
     citations: ["Emergency procedures"],
     workOrder: { created: true, reference: "WO-1", summary: "Water near outlet", nextUpdate: "Security will respond." },
+    floorplan: {
+      included: false,
+      assetId: "",
+      title: "",
+      floor: "",
+      imageUrl: "",
+      alt: "",
+      caption: "",
+      annotation: null
+    },
     suggestions: ["I am in a safe area."]
   };
 
@@ -130,6 +162,109 @@ test("emergency assistant responses always include safe 000 guidance", () => {
   });
   assert.equal(maximumReply.reply.length <= ASSISTANT_REPLY_MAX_LENGTH, true);
   assert.equal(assistantOutputSchema.safeParse(maximumReply).success, true);
+});
+
+test("tenant provider sends approved floorplan bytes only for relevant image-grounded calls", async () => {
+  const requests = [];
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const client = {
+    responses: {
+      create: async (request) => {
+        requests.push(request);
+        const hasImage = request.input[1].content.some((item) => item.type === "input_image");
+        return {
+          output_text: JSON.stringify(assistantResponse(hasImage ? {
+            included: true,
+            assetId: floorplan.id,
+            caption: "The restaurant and stairs are highlighted for comparison.",
+            annotation: {
+              selections: [
+                { regionId: "restaurant", role: "primary", reason: "This is the requested destination." },
+                { regionId: "central_stairs", role: "secondary", reason: "This is the spatial reference." }
+              ],
+              relationship: {
+                type: "location",
+                fromRegionId: "central_stairs",
+                toRegionId: "restaurant",
+                direction: "northeast"
+              }
+            }
+          } : undefined))
+        };
+      }
+    }
+  };
+  const provider = createGptProvider({
+    configured: true,
+    authMode: "api-key",
+    apiKey: "test",
+    endpoint: "https://example.openai.azure.com/openai/v1/",
+    deployment: "gpt-5.6-terra"
+  }, { client });
+  const building = findBuilding("building-meridian");
+  const dataUrl = "data:image/jpeg;base64,/9j/2Q==";
+
+  const grounded = await provider.respondToTenant(
+    building,
+    "Show me the Level 12 floor plan",
+    [],
+    { asset: floorplan, dataUrl }
+  );
+  const imageInput = requests[0].input[1].content.find((item) => item.type === "input_image");
+  assert.deepEqual(imageInput, { type: "input_image", image_url: dataUrl, detail: "original" });
+  assert.equal(grounded.floorplan.imageUrl, floorplan.imageUrl);
+  assert.equal(grounded.floorplan.title, floorplan.title);
+  assert.equal(grounded.floorplan.annotation.regions[0].label, "Restaurant");
+  assert.equal(grounded.floorplan.annotation.marker.kind, "direction-arrow");
+  const modelInput = JSON.parse(requests[0].input[1].content[0].text);
+  assert.equal(modelInput.floorplanCatalog.id, "meridian-house-level-12");
+  assert.doesNotMatch(JSON.stringify(modelInput.floorplanCatalog), /polygon|coordinates|axis|boundary/i);
+
+  const textOnly = await provider.respondToTenant(building, "What are the concierge hours?", []);
+  assert.equal(requests[1].input[1].content.some((item) => item.type === "input_image"), false);
+  assert.equal(textOnly.floorplan.included, false);
+});
+
+test("tenant floorplan grounding rejects unknown model asset identifiers", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  assert.throws(
+    () => groundTenantFloorplan(
+      assistantResponse({
+        included: true,
+        assetId: "invented-floorplan",
+        caption: "Invented",
+        annotation: null
+      }),
+      { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+    ),
+    ModelResponseError
+  );
+});
+
+test("tenant floorplan grounding rejects unknown model region identifiers", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  assert.throws(
+    () => groundTenantFloorplan(
+      assistantResponse({
+        included: true,
+        assetId: floorplan.id,
+        caption: "Invented",
+        annotation: {
+          selections: [
+            { regionId: "invented-region", role: "primary", reason: "Invented region." }
+          ],
+          relationship: {
+            type: "count",
+            fromRegionId: null,
+            toRegionId: null,
+            direction: null
+          }
+        }
+      }),
+      { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+    ),
+    ModelResponseError
+  );
 });
 
 test("assistant qualification questions stay with Aurelia", () => {

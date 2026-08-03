@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { ZodError } from "zod";
 import { getConfig, publicStatus } from "./src/config.js";
 import { buildingProfiles, comparableSales, findBuilding, findLead, findLease, findListing, leads, leaseDocuments, listings } from "./src/data.js";
+import { findFloorplanForMessage, loadFloorplanImage } from "./src/floorplan-assets.js";
 import { abstractLease, analyseMaintenance, answerTenant, buildEsgEvidence, createEsgReport, draftValuation, generateMarketing, getMockImage, matchProperties, qualifyLead } from "./src/mock-services.js";
 import { esgPortfolio, findMaintenanceAsset, maintenanceAssets } from "./src/operations-data.js";
 import { createGptProvider, ModelResponseError } from "./src/providers/gpt.js";
@@ -243,9 +244,15 @@ app.post("/api/assistant", async (request, response, next) => {
   try {
     const { mode, buildingId, message, history } = assistantRequestSchema.parse(request.body);
     const building = resolveBuilding(buildingId);
-    const output = mode === "live"
-      ? await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment).respondToTenant(building, message, history)
-      : answerTenant(buildingId, message, history);
+    let output;
+    if (mode === "live") {
+      const floorplan = findFloorplanForMessage(building, message);
+      const floorplanInput = floorplan ? await loadFloorplanImage(root, floorplan) : null;
+      output = await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment)
+        .respondToTenant(building, message, history, floorplanInput);
+    } else {
+      output = answerTenant(buildingId, message, history);
+    }
     response.json({ mode, buildingId, ...output });
   } catch (error) {
     next(error);

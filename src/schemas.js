@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { FLOORPLAN_REGION_IDS } from "./floorplan-regions.js";
 
 export const modeSchema = z.enum(["mock", "live"]).default("mock");
 export const ASSISTANT_REPLY_MAX_LENGTH = 1600;
@@ -185,7 +186,85 @@ export const assistantRequestSchema = z.object({
   history: z.array(assistantHistoryItemSchema).max(10).default([])
 });
 
-export const assistantOutputSchema = z.object({
+export const floorplanRegionIdSchema = z.enum(FLOORPLAN_REGION_IDS);
+export const floorplanRegionRoleSchema = z.enum(["primary", "secondary", "context"]);
+export const floorplanRelationshipTypeSchema = z.enum(["location", "adjacency", "direction", "count", "size"]);
+export const floorplanDirectionSchema = z.enum([
+  "north",
+  "northeast",
+  "east",
+  "southeast",
+  "south",
+  "southwest",
+  "west",
+  "northwest"
+]);
+
+export const floorplanAnnotationIntentSchema = z.object({
+  selections: z.array(z.object({
+    regionId: floorplanRegionIdSchema,
+    role: floorplanRegionRoleSchema,
+    reason: z.string().trim().min(2).max(160)
+  }).strict()).min(1).max(8),
+  relationship: z.object({
+    type: floorplanRelationshipTypeSchema,
+    fromRegionId: floorplanRegionIdSchema.nullable(),
+    toRegionId: floorplanRegionIdSchema.nullable(),
+    direction: floorplanDirectionSchema.nullable()
+  }).strict()
+}).strict();
+
+const assistantFloorplanIntentSchema = z.object({
+  included: z.boolean(),
+  assetId: z.string().max(80),
+  caption: z.string().max(500),
+  annotation: floorplanAnnotationIntentSchema.nullable()
+}).strict();
+
+const floorplanPointSchema = z.object({
+  x: z.number().int().min(0).max(10000),
+  y: z.number().int().min(0).max(10000)
+}).strict();
+
+const groundedFloorplanAnnotationSchema = z.object({
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  regions: z.array(z.object({
+    id: floorplanRegionIdSchema,
+    label: z.string().min(1).max(120),
+    type: z.enum(["room", "circulation", "transition", "service", "outdoor"]),
+    areaSqm: z.number().positive().nullable(),
+    role: floorplanRegionRoleSchema,
+    reason: z.string().min(2).max(160),
+    polygon: z.array(floorplanPointSchema).min(3).max(20),
+    labelAnchor: floorplanPointSchema
+  }).strict()).min(1).max(8),
+  relationship: z.object({
+    type: floorplanRelationshipTypeSchema,
+    fromRegionId: floorplanRegionIdSchema.nullable(),
+    toRegionId: floorplanRegionIdSchema.nullable(),
+    direction: floorplanDirectionSchema.nullable(),
+    label: z.string().min(2).max(240)
+  }).strict(),
+  marker: z.object({
+    kind: z.enum(["shared-boundary", "direction-arrow", "axis-arrow"]),
+    points: z.array(floorplanPointSchema).length(2)
+  }).strict().nullable(),
+  safetyNote: z.string().min(10).max(240)
+}).strict();
+
+const assistantFloorplanSchema = z.object({
+  included: z.boolean(),
+  assetId: z.string().max(80),
+  title: z.string().max(160),
+  floor: z.string().max(80),
+  imageUrl: z.string().max(240),
+  alt: z.string().max(300),
+  caption: z.string().max(500),
+  annotation: groundedFloorplanAnnotationSchema.nullable()
+}).strict();
+
+const assistantResponseShape = {
   reply: z.string().min(20).max(ASSISTANT_REPLY_MAX_LENGTH),
   category: z.enum(["Building information", "Maintenance", "Access & security", "Lease & payments", "Amenity booking", "Emergency"]),
   urgency: z.enum(["Routine", "Priority", "Emergency"]),
@@ -200,7 +279,17 @@ export const assistantOutputSchema = z.object({
   suggestions: z.array(
     z.string().min(2).max(160).describe("A ready-to-send tenant confirmation or answer statement, never a question.")
   ).max(3)
-});
+};
+
+export const assistantModelOutputSchema = z.object({
+  ...assistantResponseShape,
+  floorplan: assistantFloorplanIntentSchema
+}).strict();
+
+export const assistantOutputSchema = z.object({
+  ...assistantResponseShape,
+  floorplan: assistantFloorplanSchema
+}).strict();
 
 export const maintenanceRequestSchema = z.object({
   mode: modeSchema,
@@ -492,10 +581,66 @@ export const leaseJsonSchema = {
   }
 };
 
+const nullableFloorplanRegionIdJsonSchema = {
+  anyOf: [
+    { type: "string", enum: FLOORPLAN_REGION_IDS },
+    { type: "null" }
+  ]
+};
+
+const nullableFloorplanDirectionJsonSchema = {
+  anyOf: [
+    {
+      type: "string",
+      enum: ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
+    },
+    { type: "null" }
+  ]
+};
+
+const floorplanAnnotationIntentJsonSchema = {
+  anyOf: [
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["selections", "relationship"],
+      properties: {
+        selections: {
+          type: "array",
+          minItems: 1,
+          maxItems: 8,
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["regionId", "role", "reason"],
+            properties: {
+              regionId: { type: "string", enum: FLOORPLAN_REGION_IDS },
+              role: { type: "string", enum: ["primary", "secondary", "context"] },
+              reason: { type: "string", minLength: 2, maxLength: 160 }
+            }
+          }
+        },
+        relationship: {
+          type: "object",
+          additionalProperties: false,
+          required: ["type", "fromRegionId", "toRegionId", "direction"],
+          properties: {
+            type: { type: "string", enum: ["location", "adjacency", "direction", "count", "size"] },
+            fromRegionId: nullableFloorplanRegionIdJsonSchema,
+            toRegionId: nullableFloorplanRegionIdJsonSchema,
+            direction: nullableFloorplanDirectionJsonSchema
+          }
+        }
+      }
+    },
+    { type: "null" }
+  ]
+};
+
 export const assistantJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["reply", "category", "urgency", "recommendedAction", "citations", "workOrder", "suggestions"],
+  required: ["reply", "category", "urgency", "recommendedAction", "citations", "workOrder", "floorplan", "suggestions"],
   properties: {
     reply: { type: "string" },
     category: { type: "string", enum: ["Building information", "Maintenance", "Access & security", "Lease & payments", "Amenity booking", "Emergency"] },
@@ -511,6 +656,17 @@ export const assistantJsonSchema = {
         reference: { type: "string" },
         summary: { type: "string" },
         nextUpdate: { type: "string" }
+      }
+    },
+    floorplan: {
+      type: "object",
+      additionalProperties: false,
+      required: ["included", "assetId", "caption", "annotation"],
+      properties: {
+        included: { type: "boolean", description: "True only when the supplied approved floorplan image is relevant to the answer." },
+        assetId: { type: "string", maxLength: 80, description: "Use the supplied floorplan asset ID when included; otherwise return an empty string." },
+        caption: { type: "string", maxLength: 500, description: "A concise grounded description of what the plan shows, or an empty string when not included." },
+        annotation: floorplanAnnotationIntentJsonSchema
       }
     },
     suggestions: {
