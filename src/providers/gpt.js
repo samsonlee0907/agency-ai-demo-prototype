@@ -8,6 +8,7 @@ import {
 } from "../floorplan-assets.js";
 import {
   floorplanAnnotationFallbackForMessage,
+  resolveFloorplanAnaphora,
   floorplanCatalogForModel,
   groundFloorplanAnnotation,
   groundFloorplanReply
@@ -344,8 +345,9 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
     },
     async respondToTenant(building, message, history, floorplan = null) {
       const annotationRequested = floorplan ? floorplanAnnotationRequested(message) : false;
+      const groundingMessage = floorplan ? resolveFloorplanAnaphora(message, history) : message;
       const annotationFallback = annotationRequested
-        ? floorplanAnnotationFallbackForMessage(message)
+        ? floorplanAnnotationFallbackForMessage(groundingMessage)
         : null;
       const buildingContext = {
         ...building,
@@ -370,7 +372,7 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
         annotationRequested,
         annotationFallback
       );
-      grounded.reply = groundFloorplanReply(message, grounded.reply);
+      grounded.reply = groundFloorplanReply(groundingMessage, grounded.reply);
       const normalized = ensureEmergencyGuidance(normalizeAssistantFollowUps(
         grounded,
         [...history, { role: "user", content: message }]

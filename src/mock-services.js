@@ -8,6 +8,7 @@ import {
 } from "./floorplan-assets.js";
 import {
   floorplanAnnotationFallbackForMessage,
+  resolveFloorplanAnaphora,
   groundFloorplanAnnotation,
   groundFloorplanReply
 } from "./floorplan-regions.js";
@@ -412,7 +413,7 @@ export function answerTenant(buildingId, message, history = []) {
     });
   }
 
-  return finalize(answerTenantNonEmergency(building, normalized));
+  return finalize(answerTenantNonEmergency(building, normalized, history));
 }
 
   function round(value, digits = 1) {
@@ -782,15 +783,16 @@ function mockFloorplanAnswer(normalized) {
   return plainPlan();
 }
 
-function answerTenantNonEmergency(building, normalized) {
+function answerTenantNonEmergency(building, normalized, history = []) {
   const findKnowledge = (pattern) => building.knowledge.find((article) => pattern.test(`${article.title} ${article.content}`));
-  const floorplan = findFloorplanForMessage(building, normalized);
+  const grounding = resolveFloorplanAnaphora(normalized, history);
+  const floorplan = findFloorplanForMessage(building, grounding);
 
   if (floorplan) {
     const floorplanGuide = findKnowledge(/floor plan|floorplan|layout/i);
-    const floorplanAnswer = mockFloorplanAnswer(normalized);
-    const fallbackIntent = floorplanAnnotationRequested(normalized)
-      ? floorplanAnnotationFallbackForMessage(normalized)
+    const floorplanAnswer = mockFloorplanAnswer(grounding);
+    const fallbackIntent = floorplanAnnotationRequested(grounding)
+      ? floorplanAnnotationFallbackForMessage(grounding)
       : null;
     const intent = floorplanAnswer.annotation ?? fallbackIntent;
     const annotation = groundFloorplanAnnotation(floorplan.id, intent);
@@ -798,7 +800,7 @@ function answerTenantNonEmergency(building, normalized) {
       ? floorplanAnswer.caption
       : "Validated floorplan regions highlighted for spatial orientation only.";
     return {
-      reply: `${groundFloorplanReply(normalized, floorplanAnswer.reply)} The static plan does not verify accessibility, obstructions or emergency routes; use posted signage and warden directions for those needs.`,
+      reply: `${groundFloorplanReply(grounding, floorplanAnswer.reply)} The static plan does not verify accessibility, obstructions or emergency routes; use posted signage and warden directions for those needs.`,
       category: "Building information",
       urgency: "Routine",
       recommendedAction: annotation

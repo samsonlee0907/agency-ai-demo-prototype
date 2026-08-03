@@ -94,6 +94,7 @@ function toCatalog(index) {
         id: region.id,
         label: region.label,
         proseName: region.proseName || region.label,
+        ...(region.prosePhrase ? { prosePhrase: region.prosePhrase } : {}),
         type: region.type,
         ...(region.parentId ? { parentId: region.parentId } : {}),
         ...(region.areaSqm === undefined ? {} : { areaSqm: region.areaSqm }),

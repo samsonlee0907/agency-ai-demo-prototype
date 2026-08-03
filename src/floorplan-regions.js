@@ -293,6 +293,14 @@ function adjacentRegionIdOf(regionId, mentionedIds = []) {
   return pairs.find((id) => mentionedIds.includes(id)) || pairs[0] || null;
 }
 
+// Mid-sentence naming. Everything takes a definite article and parent rooms are
+// named as blocks; only a region whose label reads as a proper noun overrides this.
+function prosePhrase(region) {
+  if (region.prosePhrase) return region.prosePhrase;
+  const isParent = catalogs.some((catalog) => catalog.regions.some((item) => item.parentId === region.id));
+  return `the ${region.proseName}${isParent ? " block" : ""}`;
+}
+
 // Every number below is read from the derived index facts, never authored here.
 function toiletFacilityFacts(regionId) {
   const region = findRegionById(regionId);
@@ -312,6 +320,55 @@ function toiletCompositionNote() {
   const ladies = findRegionById("toilets_ladies");
   if (!gents || !ladies) return "";
   return `The Toilets block holds a ${gents.label} to the ${relativeSide(gents, ladies)} and a ${ladies.label} to the ${relativeSide(ladies, gents)}.`;
+}
+
+// A follow-up such as "how to reach it from the kitchen?" carries the subject only in
+// the conversation. Terra sees that history, but the deterministic layer used to see
+// the bare message and annotated the wrong pair, so resolve the pronoun first.
+const anaphoraPattern = /\bit\b|\bthem\b|\bthey\b|(?<!\b(?:is|are|was|were)\s)\bthere\b|\bthat\b(?=[\s?.!]*$)/;
+
+const anaphoraPhrases = {
+  reception: "the reception",
+  restaurant: "the restaurant",
+  central_stairs: "the stairs",
+  toilets: "the toilets",
+  toilets_gents: "the gents washroom",
+  toilets_ladies: "the ladies washroom",
+  passage: "the passage",
+  kitchen: "the kitchen",
+  verandah: "the verandah"
+};
+
+function antecedentRegionId(history, exclude) {
+  const turns = Array.isArray(history) ? history : [];
+  const scan = (wantedRole) => {
+    for (let index = turns.length - 1; index >= 0; index -= 1) {
+      const turn = turns[index];
+      const role = String(turn?.role || "").toLowerCase();
+      if (wantedRole && role !== wantedRole) continue;
+      const candidate = mentionedRegionIds(String(turn?.content || "").toLowerCase())
+        .find((id) => !exclude.includes(id));
+      if (candidate) return candidate;
+    }
+    return null;
+  };
+  return scan("user") || scan(null);
+}
+
+export function resolveFloorplanAnaphora(message, history = []) {
+  const normalized = String(message || "").toLowerCase();
+  const match = normalized.match(anaphoraPattern);
+  if (!match) return normalized;
+  const antecedent = antecedentRegionId(history, mentionedRegionIds(normalized));
+  if (!antecedent) return normalized;
+  const before = normalized.slice(0, match.index);
+  // "get there" needs the preposition the pronoun was carrying: "get to the kitchen".
+  const needsPreposition = match[0] === "there"
+    && !/\b(?:to|from|into|towards?|near|beside|at|by|of)\s+$/.test(before);
+  return before
+    + (needsPreposition ? "to " : "")
+    + anaphoraPhrases[antecedent]
+    + normalized.slice(match.index + match[0].length);
 }
 
 export function floorplanAnnotationFallbackForMessage(message) {
@@ -456,6 +513,10 @@ function numberWord(value) {
   return numberWords[value] || String(value);
 }
 
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function plural(count, singular, pluralForm = `${singular}s`) {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
@@ -475,6 +536,29 @@ function childRegions(parentId) {
 
 export function groundFloorplanReply(message, reply) {
   const normalized = String(message || "").toLowerCase();
+  const regionIds = mentionedRegionIds(normalized);
+  // "How do I get to X from Y" must answer relative to Y, and match the overlay arrow.
+  if (wayfindingPattern.test(normalized) && regionIds.length >= 2) {
+    const { fromRegionId, toRegionId } = wayfindingEndpoints(normalized, regionIds);
+    const from = findRegionById(fromRegionId);
+    const to = findRegionById(toRegionId);
+    if (from && to) {
+      return `${capitalize(prosePhrase(to))} is ${directionBetweenRegions(from, to)} of ${prosePhrase(from)} on the Level 12 plan. This is general plan orientation only, not a confirmed walking route.`;
+    }
+  }
+  // Adjacency wording for non-washroom rooms, so the sentence names the same pair the
+  // overlay highlights.
+  if (!toiletMentionPattern.test(normalized)
+    && /\b(?:nearest|closest|next to|adjacent|adjoin(?:s|ing)?|beside)\b/.test(normalized)
+    && regionIds.length) {
+    const [targetId] = regionIds;
+    const neighbourId = adjacentRegionIdOf(targetId, regionIds.slice(1));
+    if (neighbourId) {
+      const target = findRegionById(targetId);
+      const neighbour = findRegionById(neighbourId);
+      return `${capitalize(prosePhrase(neighbour))} directly adjoins ${prosePhrase(target)}, immediately ${relativeSide(neighbour, target)} of it on the Level 12 plan.`;
+    }
+  }
   if (!toiletMentionPattern.test(normalized)) return reply;
   const regionId = resolveToiletRegionId(normalized);
   const facts = toiletFacilityFacts(regionId);

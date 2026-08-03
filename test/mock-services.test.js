@@ -115,6 +115,26 @@ test("tenant assistant Mock mode annotates count and size evidence deterministic
   assert.equal(size.floorplan.annotation.regions[0].areaSqm, 114.4);
 });
 
+test("tenant assistant resolves a follow-up pronoun from the conversation", () => {
+  const history = [
+    { role: "user", content: "where is the gents washroom?" },
+    { role: "assistant", content: "The Gents washroom is the western room of the Toilets block." }
+  ];
+
+  const route = answerTenant("building-meridian", "how to reach it from the kitchen?", history);
+  assert.deepEqual(route.floorplan.annotation.regions.map((region) => region.id), ["toilets_gents", "kitchen"]);
+  assert.equal(route.floorplan.annotation.relationship.type, "direction");
+  assert.match(route.reply, /The Gents washroom is northwest of the Kitchen/);
+
+  const count = answerTenant("building-meridian", "how many cubicles does it have?", history);
+  assert.deepEqual(count.floorplan.annotation.regions.map((region) => region.id), ["toilets_gents"]);
+  assert.match(count.reply, /Gents washroom shows 2 enclosed toilet cubicles/);
+
+  // Without a conversation there is no antecedent, so nothing may be invented.
+  const bare = answerTenant("building-meridian", "how do I get there?", []);
+  assert.equal(bare.floorplan.annotation, null);
+});
+
 test("tenant assistant grounds toilet variants and safe wayfinding overlays", () => {
   const toiletScenarios = [
     ["How many toilets does the ladies washroom have?", /Ladies washroom shows 3 enclosed toilet cubicles/, ["toilets_ladies"]],

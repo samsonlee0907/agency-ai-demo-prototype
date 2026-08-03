@@ -7,6 +7,7 @@ import { ZodError } from "zod";
 import { getConfig, publicStatus } from "./src/config.js";
 import { buildingProfiles, comparableSales, findBuilding, findLead, findLease, findListing, leads, leaseDocuments, listings } from "./src/data.js";
 import { findFloorplanForMessage, loadFloorplanImage } from "./src/floorplan-assets.js";
+import { resolveFloorplanAnaphora } from "./src/floorplan-regions.js";
 import { abstractLease, analyseMaintenance, answerTenant, buildEsgEvidence, createEsgReport, draftValuation, generateMarketing, getMockImage, matchProperties, qualifyLead } from "./src/mock-services.js";
 import { esgPortfolio, findMaintenanceAsset, maintenanceAssets } from "./src/operations-data.js";
 import { createGptProvider, ModelResponseError } from "./src/providers/gpt.js";
@@ -246,7 +247,7 @@ app.post("/api/assistant", async (request, response, next) => {
     const building = resolveBuilding(buildingId);
     let output;
     if (mode === "live") {
-      const floorplan = findFloorplanForMessage(building, message);
+      const floorplan = findFloorplanForMessage(building, resolveFloorplanAnaphora(message, history));
       const floorplanInput = floorplan ? await loadFloorplanImage(root, floorplan) : null;
       output = await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment)
         .respondToTenant(building, message, history, floorplanInput);
