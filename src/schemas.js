@@ -188,7 +188,7 @@ export const assistantRequestSchema = z.object({
 
 export const floorplanRegionIdSchema = z.enum(FLOORPLAN_REGION_IDS);
 export const floorplanRegionRoleSchema = z.enum(["primary", "secondary", "context"]);
-export const floorplanRelationshipTypeSchema = z.enum(["location", "adjacency", "direction", "count", "size"]);
+export const floorplanRelationshipTypeSchema = z.enum(["location", "adjacency", "direction", "route", "count", "size"]);
 export const floorplanDirectionSchema = z.enum([
   "north",
   "northeast",
@@ -247,9 +247,13 @@ const groundedFloorplanAnnotationSchema = z.object({
     label: z.string().min(2).max(240)
   }).strict(),
   marker: z.object({
-    kind: z.enum(["shared-boundary", "direction-arrow", "axis-arrow"]),
-    points: z.array(floorplanPointSchema).length(2)
-  }).strict().nullable(),
+    kind: z.enum(["shared-boundary", "direction-arrow", "axis-arrow", "route-path"]),
+    points: z.array(floorplanPointSchema).min(2).max(16)
+  }).strict().superRefine((marker, ctx) => {
+    if (marker.kind !== "route-path" && marker.points.length !== 2) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Only a route path may carry more than two marker points." });
+    }
+  }).nullable(),
   safetyNote: z.string().min(10).max(240)
 }).strict();
 
@@ -625,7 +629,7 @@ const floorplanAnnotationIntentJsonSchema = {
           additionalProperties: false,
           required: ["type", "fromRegionId", "toRegionId", "direction"],
           properties: {
-            type: { type: "string", enum: ["location", "adjacency", "direction", "count", "size"] },
+            type: { type: "string", enum: ["location", "adjacency", "direction", "route", "count", "size"] },
             fromRegionId: nullableFloorplanRegionIdJsonSchema,
             toRegionId: nullableFloorplanRegionIdJsonSchema,
             direction: nullableFloorplanDirectionJsonSchema

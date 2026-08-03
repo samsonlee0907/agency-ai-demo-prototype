@@ -1,4 +1,5 @@
 import { loadFloorplanIndexes } from "./floorplan-index.js";
+import { routeBetweenRegions, floorplanRegionIsConnected, circulationForModel } from "./floorplan-routing.js";
 
 export const FLOORPLAN_REGION_SCALE = 1000;
 
@@ -159,6 +160,31 @@ export function floorplanCatalogForModel(assetId) {
       type: "adjacent",
       regionIds,
       note: `${regionIds[1]} lies to the ${relativeSide(findRegionById(regionIds[1]), findRegionById(regionIds[0]))} of ${regionIds[0]}.`
+    })),
+    circulation: {
+      note: "Each entry is a doorway, sliding partition or open threshold drawn on the plan. You may only describe walking between two places by following these links; never invent a connection that is not listed.",
+      links: circulationForModel(catalog)
+    }
+  };
+}
+
+/**
+ * The walking route the server has already resolved for a question, in the
+ * geometry-free form the model narrates from.
+ */
+export function floorplanRouteForModel(assetId, fromRegionId, toRegionId) {
+  const catalog = findFloorplanRegionCatalog(assetId);
+  const route = catalog ? routeBetweenRegions(catalog, fromRegionId, toRegionId) : null;
+  if (!route) return null;
+  return {
+    note: "This is the route the verified circulation graph resolved. Narrate these steps; do not add, reorder or invent any.",
+    fromRegionId,
+    toRegionId,
+    steps: route.legs.map((leg) => ({
+      fromRegionId: leg.fromRegionId,
+      toRegionId: leg.toRegionId,
+      heading: leg.direction,
+      via: leg.via
     }))
   };
 }
@@ -207,7 +233,12 @@ const regionMentionPatterns = [
   ["toilets", toiletMentionPattern],
   ["passage", /\bpassage\b/],
   ["kitchen", /\bkitchen\b/],
-  ["verandah", /\bverandah\b/]
+  ["verandah", /\bverandah\b/],
+  ["office_west_64_2", /\b(?:west|western)(?:ern)?\s+(?:64\.2\s*(?:m2|m²)?\s*)?office\b/],
+  ["office_east_64_2", /\b(?:east|eastern)\s+(?:64\.2\s*(?:m2|m²)?\s*)?office\b/],
+  ["office_114_4", /\b(?:largest|biggest)\s+office\b|\b114\.4\b/],
+  ["storage_west", /\bwest(?:ern)?\s+storage\b/],
+  ["storage_east", /\beast(?:ern)?\s+storage\b/]
 ];
 
 // The plan labels a Gents and a Ladies washroom inside the Toilets block, so gendered
@@ -249,6 +280,28 @@ function findRegionById(regionId) {
     if (region) return region;
   }
   return null;
+}
+
+function catalogContaining(regionId) {
+  return catalogs.find((catalog) => catalog.regions.some((region) => region.id === regionId)) || null;
+}
+
+// Routes are resolved from drawn doorways only, so a pairing the plan does not connect
+// simply has no route and the answer falls back to plan orientation.
+function routeForRegions(fromRegionId, toRegionId) {
+  const catalog = catalogContaining(fromRegionId);
+  if (!catalog || catalog !== catalogContaining(toRegionId)) return null;
+  if (!floorplanRegionIsConnected(catalog, fromRegionId) || !floorplanRegionIsConnected(catalog, toRegionId)) return null;
+  return routeBetweenRegions(catalog, fromRegionId, toRegionId);
+}
+
+export function floorplanRouteForMessage(message) {
+  const normalized = String(message || "").toLowerCase();
+  const regionIds = mentionedRegionIds(normalized);
+  if (!wayfindingPattern.test(normalized) || regionIds.length < 2) return null;
+  const { fromRegionId, toRegionId } = wayfindingEndpoints(normalized, regionIds);
+  const route = routeForRegions(fromRegionId, toRegionId);
+  return route ? { fromRegionId, toRegionId, route } : null;
 }
 
 function boundingBox(polygon) {
@@ -336,7 +389,12 @@ const anaphoraPhrases = {
   toilets_ladies: "the ladies washroom",
   passage: "the passage",
   kitchen: "the kitchen",
-  verandah: "the verandah"
+  verandah: "the verandah",
+  office_west_64_2: "the west office",
+  office_east_64_2: "the east office",
+  office_114_4: "the largest office",
+  storage_west: "the west storage",
+  storage_east: "the east storage"
 };
 
 function antecedentRegionId(history, exclude) {
@@ -380,6 +438,25 @@ export function floorplanAnnotationFallbackForMessage(message) {
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
   if (wayfindingPattern.test(normalized) && regionIds.length >= 2) {
     const { fromRegionId, toRegionId } = wayfindingEndpoints(normalized, regionIds);
+    const route = routeForRegions(fromRegionId, toRegionId);
+    if (route) {
+      const endpoints = [toRegionId, fromRegionId];
+      return {
+        selections: [
+          select(toRegionId, "primary", "This is the requested destination."),
+          select(fromRegionId, "secondary", "This is the requested starting point."),
+          ...route.regionIds
+            .filter((id) => !endpoints.includes(id))
+            .map((id) => select(id, "context", "The route passes through here."))
+        ],
+        relationship: {
+          type: "route",
+          fromRegionId,
+          toRegionId,
+          direction: null
+        }
+      };
+    }
     return {
       selections: [
         select(toRegionId, "primary", "This is the requested destination context."),
@@ -534,16 +611,100 @@ function childRegions(parentId) {
   return catalogs.flatMap((catalog) => catalog.regions).filter((region) => region.parentId === parentId);
 }
 
+export function describeFloorplanRoute(fromRegionId, toRegionId, route) {
+  const from = findRegionById(fromRegionId);
+  const to = findRegionById(toRegionId);
+  const steps = route.legs.map((leg, index) => {
+    const target = findRegionById(leg.toRegionId);
+    const arrival = index === route.legs.length - 1 ? prosePhrase(to) : prosePhrase(target);
+    const opening = leg.via === "opening" ? "the opening" : `the ${leg.via}`;
+    return `head ${leg.direction} through ${opening} into ${arrival}`;
+  });
+  const journey = steps.length <= 2
+    ? steps.join(", then ")
+    : `${steps.slice(0, -1).join(", then ")}, and finally ${steps[steps.length - 1]}`;
+  return `From ${prosePhrase(from)}, ${journey}. That is ${plural(route.legs.length, "doorway", "doorways")} along the circulation drawn on the Level 12 plan; it is not checked for step-free access, door locking or emergency egress.`;
+}
+
 export function groundFloorplanReply(message, reply) {
+  return groundedFloorplanSentence(message) ?? reply;
+}
+
+// Live answers are written by the model, which can see the plan image and the verified
+// index, so they are richer than a template. They are kept only when they agree with the
+// index: a reply that states an unsupported count, wanders off the resolved route or
+// contradicts the derived orientation is replaced by the deterministic sentence.
+export function verifyFloorplanReply(message, reply) {
+  const grounded = groundedFloorplanSentence(message);
+  if (!grounded) return reply;
+  return floorplanReplyConflicts(message, reply, grounded).length ? grounded : reply;
+}
+
+const fixtureNounPattern = /\b(?:cubicles?|toilets?|wcs?|basins?|sinks?|urinals?|fixtures?|washrooms?|bathrooms?|restrooms?)\b/;
+const compassPattern = /\b(north|south|east|west)(?:ern|east|west)?\b/g;
+
+function supportedFixtureCounts(normalized) {
+  const regionId = resolveToiletRegionId(normalized);
+  const facts = toiletFacilityFacts(regionId);
+  if (!facts) return null;
+  const children = childRegions(regionId);
+  const values = [facts.cubicles, facts.basins, facts.urinals, facts.total, 0];
+  if (children.length) {
+    values.push(children.length);
+    for (const child of children) {
+      const childFacts = toiletFacilityFacts(child.id);
+      values.push(childFacts.cubicles, childFacts.basins, childFacts.urinals, childFacts.total);
+    }
+  }
+  return new Set(values);
+}
+
+export function floorplanReplyConflicts(message, reply, grounded) {
+  const normalized = String(message || "").toLowerCase();
+  const text = String(reply || "");
+  if (!text.trim()) return ["The model returned no reply."];
+  const conflicts = [];
+
+  if (toiletMentionPattern.test(normalized)) {
+    const supported = supportedFixtureCounts(normalized);
+    for (const match of text.matchAll(/\b(\d+)\b([^.;]{0,40})/g)) {
+      const value = Number(match[1]);
+      if (supported && fixtureNounPattern.test(match[2]) && !supported.has(value)) {
+        conflicts.push(`The index does not support a count of ${value}.`);
+      }
+    }
+  }
+
+  const wayfinding = floorplanRouteForMessage(normalized);
+  if (wayfinding) {
+    const onRoute = new Set(wayfinding.route.regionIds);
+    for (const id of mentionedRegionIds(text.toLowerCase())) {
+      if (!onRoute.has(id)) conflicts.push(`${id} is not on the resolved route.`);
+    }
+  }
+
+  const groundedDirections = new Set([...String(grounded).matchAll(compassPattern)].map((match) => match[1]));
+  if (groundedDirections.size) {
+    for (const match of text.matchAll(compassPattern)) {
+      if (!groundedDirections.has(match[1])) conflicts.push(`The derived geometry does not place anything ${match[1]}.`);
+    }
+  }
+  return conflicts;
+}
+
+function groundedFloorplanSentence(message) {
   const normalized = String(message || "").toLowerCase();
   const regionIds = mentionedRegionIds(normalized);
-  // "How do I get to X from Y" must answer relative to Y, and match the overlay arrow.
+  // "How do I get to X from Y" is answered by walking the verified circulation graph,
+  // so the sentence describes the same doorways the overlay draws.
   if (wayfindingPattern.test(normalized) && regionIds.length >= 2) {
     const { fromRegionId, toRegionId } = wayfindingEndpoints(normalized, regionIds);
+    const route = routeForRegions(fromRegionId, toRegionId);
+    if (route) return describeFloorplanRoute(fromRegionId, toRegionId, route);
     const from = findRegionById(fromRegionId);
     const to = findRegionById(toRegionId);
     if (from && to) {
-      return `${capitalize(prosePhrase(to))} is ${directionBetweenRegions(from, to)} of ${prosePhrase(from)} on the Level 12 plan. This is general plan orientation only, not a confirmed walking route.`;
+      return `${capitalize(prosePhrase(to))} is ${directionBetweenRegions(from, to)} of ${prosePhrase(from)} on the Level 12 plan. The plan does not draw a connected walking route between them, so this is general orientation only.`;
     }
   }
   // Adjacency wording for non-washroom rooms, so the sentence names the same pair the
@@ -559,10 +720,10 @@ export function groundFloorplanReply(message, reply) {
       return `${capitalize(prosePhrase(neighbour))} directly adjoins ${prosePhrase(target)}, immediately ${relativeSide(neighbour, target)} of it on the Level 12 plan.`;
     }
   }
-  if (!toiletMentionPattern.test(normalized)) return reply;
+  if (!toiletMentionPattern.test(normalized)) return null;
   const regionId = resolveToiletRegionId(normalized);
   const facts = toiletFacilityFacts(regionId);
-  if (!facts) return reply;
+  if (!facts) return null;
   const composition = toiletCompositionNote();
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
   if (asksForCount && /\burinals?\b/.test(normalized)) {
@@ -607,7 +768,7 @@ export function groundFloorplanReply(message, reply) {
     const sibling = childRegions("toilets").find((item) => item.id !== regionId);
     return `The ${region.label} is the ${compassAdjective(relativeSide(region, sibling))} room of the Toilets block, ${relativeSide(region, passage)} of the labelled ${passage.label} and ${relativeSide(region, sibling)} of the ${sibling.label}.`;
   }
-  return reply;
+  return null;
 }
 
 function toSourcePoint(point, catalog) {
@@ -648,10 +809,15 @@ function directionBetweenRegions(from, to) {
   return directions[(sector + directions.length) % directions.length];
 }
 
-function relationshipLabel(relationship, regions, transition) {
+function relationshipLabel(relationship, regions, transition, route) {
   const byId = new Map(regions.map((region) => [region.id, region]));
   const from = byId.get(relationship.fromRegionId);
   const to = byId.get(relationship.toRegionId);
+  if (route) {
+    const via = route.regionIds.slice(1, -1).map((id) => byId.get(id).label);
+    const through = via.length ? ` via ${via.join(", ")}` : " directly";
+    return `Walking route from ${from.label} to ${to.label}${through}`;
+  }
   if (transition) return `${relationship.direction} along ${transition.label}; spatial direction only, not a route`;
   if (relationship.type === "adjacency") return `${from.label} directly adjoins ${to.label}`;
   if (relationship.type === "count") {
@@ -682,7 +848,7 @@ export function groundFloorplanAnnotation(assetId, intent) {
         direction: null
       }
     : intent.relationship;
-  const requiresEndpoints = ["location", "adjacency", "direction"].includes(relationship.type);
+  const requiresEndpoints = ["location", "adjacency", "direction", "route"].includes(relationship.type);
   const hasBothEndpoints = relationship.fromRegionId !== null && relationship.toRegionId !== null;
   if (requiresEndpoints && !hasBothEndpoints) throw new Error("This floorplan relationship requires two region endpoints.");
   if (hasBothEndpoints) {
@@ -715,13 +881,27 @@ export function groundFloorplanAnnotation(assetId, intent) {
   });
 
   let marker = null;
+  let route = null;
+  if (relationship.type === "route") {
+    route = routeBetweenRegions(catalog, relationship.fromRegionId, relationship.toRegionId);
+    if (!route) throw new Error("The plan does not draw a connected route between the selected regions.");
+    if (route.regionIds.some((id) => !selectedIds.includes(id))) {
+      throw new Error("Every region a route passes through must be a selected region.");
+    }
+  }
   const transition = intent.selections
     .map((selection) => regionsById.get(selection.regionId))
     .find((region) => region.type === "transition"
       && region.axis
       && adjacencyKey(...region.directionRegionIds)
         === adjacencyKey(relationship.fromRegionId, relationship.toRegionId));
-  if (["location", "direction"].includes(relationship.type)) {
+  if (route) {
+    // Every point comes from a reviewed doorway, so the drawn path can never cross a wall.
+    marker = {
+      kind: "route-path",
+      points: route.points.map((point) => toSourcePoint(point, catalog))
+    };
+  } else if (["location", "direction"].includes(relationship.type)) {
     const points = transition
       ? transition.axis
       : [
@@ -748,9 +928,11 @@ export function groundFloorplanAnnotation(assetId, intent) {
     regions,
     relationship: {
       ...relationship,
-      label: relationshipLabel(relationship, regions, transition)
+      label: relationshipLabel(relationship, regions, transition, route)
     },
     marker,
-    safetyNote: "Spatial highlight only. It is not accessibility, emergency or turn-by-turn routing guidance."
+    safetyNote: route
+      ? "Route follows circulation drawn on the plan. It is not verified for step-free access, door locking or emergency egress."
+      : "Spatial highlight only. It is not accessibility, emergency or turn-by-turn routing guidance."
   };
 }

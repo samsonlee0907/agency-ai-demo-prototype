@@ -647,6 +647,10 @@ select:focus, textarea:focus, input:focus, button:focus-visible { border-color: 
 .floorplan-relationship { stroke: #ef5b2a; stroke-width: 6; stroke-linecap: round; fill: none; }
 .floorplan-relationship.is-boundary { stroke-width: 9; }
 .floorplan-relationship.is-axis { stroke: #8736d6; }
+.floorplan-route-shadow { fill: none; stroke: #fff; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; opacity: .9; }
+.floorplan-route { fill: none; stroke: #ef5b2a; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 16 10; }
+.floorplan-route-start { fill: #fff; stroke: #ef5b2a; stroke-width: 5; }
+.floorplan-route-stop { fill: #ef5b2a; stroke: #fff; stroke-width: 3; }
 .floorplan-visual marker path { fill: #ef5b2a; }
 .floorplan-visual marker[id$="-arrow"] path { stroke: none; }
 .assistant-floorplan-card figcaption { display: grid; gap: 4px; padding: 12px 13px; }

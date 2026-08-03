@@ -6,7 +6,7 @@
   "provenance": {
     "method": "model-proposed, human-reviewed",
     "sourceImage": "public/assets/floorplans/meridian-house-level-12-floorplan.jpeg",
-    "notes": "Region polygons and fixture points were read from the source raster and checked by rendering them back over the image. Counts are never authored here: they are derived by testing which fixture points fall inside which region polygon."
+    "notes": "Region polygons and fixture points were read from the source raster and checked by rendering them back over the image. Counts are never authored here: they are derived by testing which fixture points fall inside which region polygon. Every connects relation marks a doorway, sliding partition or open threshold that is actually drawn on the plan, so routes are searched over verified circulation rather than inferred."
   },
   "regions": [
     {
@@ -33,6 +33,7 @@
     {
       "id": "office_west_64_2",
       "label": "West office 64.2 m²",
+      "proseName": "west 64.2 m² office",
       "type": "room",
       "areaSqm": 64.2,
       "description": "The western or left office labelled 64.2 m².",
@@ -42,6 +43,7 @@
     {
       "id": "office_east_64_2",
       "label": "East office 64.2 m²",
+      "proseName": "east 64.2 m² office",
       "type": "room",
       "areaSqm": 64.2,
       "description": "The eastern or right office labelled 64.2 m², immediately beside the restaurant.",
@@ -51,6 +53,7 @@
     {
       "id": "office_114_4",
       "label": "Largest office 114.4 m²",
+      "proseName": "114.4 m² office",
       "type": "room",
       "areaSqm": 114.4,
       "description": "The largest labelled office in the lower-left of the plan.",
@@ -73,6 +76,7 @@
     {
       "id": "central_stairs",
       "label": "Central stairs",
+      "proseName": "central stairs",
       "type": "circulation",
       "description": "The central stair core between the two storage rooms.",
       "polygon": [{ "x": 477, "y": 620 }, { "x": 521, "y": 620 }, { "x": 521, "y": 782 }, { "x": 477, "y": 782 }],
@@ -81,6 +85,7 @@
     {
       "id": "storage_west",
       "label": "West stair storage",
+      "proseName": "west stair storage",
       "type": "service",
       "description": "The storage room immediately left of the central stairs.",
       "polygon": [{ "x": 433, "y": 621 }, { "x": 467, "y": 621 }, { "x": 467, "y": 780 }, { "x": 433, "y": 780 }],
@@ -89,6 +94,7 @@
     {
       "id": "storage_east",
       "label": "East stair storage",
+      "proseName": "east stair storage",
       "type": "service",
       "description": "The storage room immediately right of the central stairs.",
       "polygon": [{ "x": 520, "y": 621 }, { "x": 553, "y": 621 }, { "x": 553, "y": 780 }, { "x": 520, "y": 780 }],
@@ -177,6 +183,84 @@
       "type": "adjacent",
       "regionIds": ["toilets_gents", "toilets_ladies"],
       "boundary": [{ "x": 116, "y": 147 }, { "x": 116, "y": 307 }]
+    },
+    {
+      "type": "connects",
+      "regionIds": ["toilets_gents", "toilets"],
+      "via": "door",
+      "at": { "x": 122, "y": 350 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["toilets", "passage"],
+      "via": "opening",
+      "at": { "x": 226, "y": 341 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["toilets_ladies", "passage"],
+      "via": "door",
+      "at": { "x": 224, "y": 262 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["passage", "office_114_4"],
+      "via": "door",
+      "at": { "x": 222, "y": 588 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["passage", "verandah"],
+      "via": "opening",
+      "at": { "x": 265, "y": 610 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["verandah", "office_west_64_2"],
+      "via": "sliding partition",
+      "at": { "x": 345, "y": 544 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["verandah", "office_east_64_2"],
+      "via": "sliding partition",
+      "at": { "x": 600, "y": 544 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["verandah", "storage_west"],
+      "via": "door",
+      "at": { "x": 452, "y": 625 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["verandah", "central_stairs"],
+      "via": "opening",
+      "at": { "x": 497, "y": 624 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["verandah", "storage_east"],
+      "via": "door",
+      "at": { "x": 532, "y": 625 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["verandah", "restaurant"],
+      "via": "door",
+      "at": { "x": 739, "y": 579 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["restaurant", "reception"],
+      "via": "opening",
+      "at": { "x": 794, "y": 633 }
+    },
+    {
+      "type": "connects",
+      "regionIds": ["reception", "kitchen"],
+      "via": "service door",
+      "at": { "x": 832, "y": 762 }
     }
   ]
 }

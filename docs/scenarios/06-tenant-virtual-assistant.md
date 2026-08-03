@@ -214,7 +214,7 @@ Terra is instructed to:
 - return only approved region IDs, `primary`/`secondary`/`context` roles, relationship intent, optional direction, and short reasons;
 - return `annotation: null` when no validated catalog region confidently supports the answer;
 - never return coordinates, boxes, polygons, paths, SVG, colors, labels, or dimensions;
-- never infer a walking route or door connectivity;
+- never invent door connectivity: the server supplies the verified circulation graph and the computed route, and the model narrates that route rather than deducing its own;
 - distinguish visible layout interpretation from authoritative building policy;
 - never present a static plan as proof of accessibility, current obstructions, occupancy, or emergency routes;
 - prioritize emergency safety.
@@ -264,15 +264,17 @@ type AssistantResponse = {
         labelAnchor: { x: number; y: number };
       }>;
       relationship: {
-        type: "location" | "adjacency" | "direction" | "count" | "size";
+        type: "location" | "adjacency" | "direction" | "route" | "count" | "size";
         fromRegionId: string | null;
         toRegionId: string | null;
         direction: string | null;
         label: string;
       };
       marker: null | {
-        kind: "shared-boundary" | "direction-arrow" | "axis-arrow";
-        points: [{ x: number; y: number }, { x: number; y: number }];
+        kind: "shared-boundary" | "direction-arrow" | "axis-arrow" | "route-path";
+        // exactly 2 points for every kind except route-path, which carries
+        // 2-16 server-computed waypoints
+        points: Array<{ x: number; y: number }>;
       };
       safetyNote: string;
     };
@@ -312,7 +314,27 @@ It cites the closest building article and/or the building contact. Floorplan que
 
 A 10-case GPT-5.6 Terra evaluation separated answer correctness from visual grounding. Direct uncorrected boxes averaged 97.5 for answers and 89 for grounding, but the three abstract cases averaged only 76.7 grounding and passed 1/3. Model-generated polygons improved those abstract cases to 82 and 2/3, but one polygon self-intersected and a route crossed walls and the stair core. Model-selected validated regions averaged 98 grounding and passed 3/3.
 
-The portal therefore uses full-region fills for entities, a catalog-declared shared boundary for adjacency, a centroid arrow for simple direction, and an axis arrow contained inside a transition region. It never renders an inferred walking route without a separately validated topology graph.
+The portal therefore uses full-region fills for entities, a catalog-declared shared boundary for adjacency, a centroid arrow for simple direction, and an axis arrow contained inside a transition region.
+
+## Verified circulation routes
+
+Wayfinding is answered from a separately validated topology graph rather than model inference. The index declares `connects` relations, each naming two regions, the opening type (`door`, `opening`, `sliding partition`, `service door`) and a doorway waypoint in source pixels. `validateFloorplanIndex()` rejects a connection whose waypoint does not sit on both regions' boundaries within tolerance, whose regions are unknown or identical, or that duplicates another pair. Every waypoint was checked against the source JPEG at high zoom before being committed.
+
+`src/floorplan-routing.js` builds a graph from those relations and runs Dijkstra over doorway-to-doorway distance, breaking ties on leg count. The route is therefore fully deterministic and can only traverse drawn openings.
+
+The split of responsibilities is:
+
+| Layer | Owns |
+| --- | --- |
+| Deterministic index and graph | Which rooms exist, their geometry, which openings connect them, and the exact route drawn on the plan |
+| GPT-5.6 Terra | Reading the question, resolving the endpoints, and writing the comprehensive answer using both the image and the geometry-free route summary |
+| Server verification | Substituting the deterministic sentence when the model's prose contradicts the index |
+
+Terra receives the route as region IDs, a compass heading and the opening type only — never coordinates. The `route-path` marker is built entirely from server waypoints (`fromRegion.labelAnchor`, each doorway in order, `toRegion.labelAnchor`), so the drawn polyline cannot cross a wall.
+
+`verifyFloorplanReply()` verifies rather than replaces. When a question has no deterministic answer the model's reply passes through untouched. When it does, the reply is checked for fixture counts absent from the index, catalogued regions that are not on the resolved route, and compass directions that contradict the grounded sentence; any conflict substitutes the deterministic sentence.
+
+Route answers carry a narrower safety note: the path follows the circulation drawn on the plan, but is not checked for step-free access, door locking or emergency egress.
 
 ## Data and operational boundaries
 
@@ -322,7 +344,7 @@ The portal therefore uses full-region fills for entities, a catalog-declared sha
 - The public image URL is safe to display, but its local filesystem path is never accepted from or returned to the browser.
 - The inline card overlays accessible SVG regions on the unchanged JPEG, provides a keyboard-operable original-plan toggle, visible labels and a text legend, and retains full-size open and download controls.
 - Unsupported or ambiguous questions return text-only or the approved original plan without a highlight.
-- The plan is a static demonstration, not a live occupancy, accessibility, connectivity, wayfinding, or emergency-navigation system.
+- The plan is a static demonstration, not a live occupancy, accessibility, connectivity, or emergency-navigation system. Routes follow drawn openings only and are not checked for step-free access, door locking or emergency egress.
 - `workOrder.created: true` does not create anything outside the response JSON.
 - Citations name source articles but do not provide retrieval-time document links.
 - The assistant has no access to tenant identity, account balance, lease ledger, pass database, sensor systems, or external emergency services.

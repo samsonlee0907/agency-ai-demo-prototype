@@ -360,6 +360,25 @@ function floorplanPoints(points) {
 function renderFloorplanMarker(annotation, markerId) {
   const marker = annotation.marker;
   const points = marker?.points?.map(floorplanPoint).filter(Boolean) || [];
+  if (points.length < 2) return "";
+  if (marker.kind === "route-path") {
+    const path = points.map(({ x, y }) => `${x},${y}`).join(" ");
+    const stops = points
+      .slice(1, -1)
+      .map(({ x, y }) => `<circle class="floorplan-route-stop" cx="${x}" cy="${y}" r="9" vector-effect="non-scaling-stroke"></circle>`)
+      .join("");
+    return `
+      <defs>
+        <marker id="${markerId}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 0 L 10 5 L 0 10 z"></path>
+        </marker>
+      </defs>
+      <polyline class="floorplan-route-shadow" points="${path}" vector-effect="non-scaling-stroke"></polyline>
+      <polyline class="floorplan-route" points="${path}" marker-end="url(#${markerId})" vector-effect="non-scaling-stroke"></polyline>
+      <circle class="floorplan-route-start" cx="${points[0].x}" cy="${points[0].y}" r="12" vector-effect="non-scaling-stroke"></circle>
+      ${stops}
+    `;
+  }
   if (points.length !== 2) return "";
   const [start, end] = points;
   if (marker.kind === "shared-boundary") {
@@ -434,7 +453,7 @@ function renderFloorplanCard(floorplan, messageIndex) {
         <span>${escapeHtml(floorplan.floor)}</span>
         <strong>${escapeHtml(floorplan.title)}</strong>
         <p>${escapeHtml(floorplan.caption)}</p>
-        <div class="floorplan-relationship-summary"><strong>Relationship</strong><span>${escapeHtml(annotation.relationship.label)}</span></div>
+        <div class="floorplan-relationship-summary"><strong>${annotation.relationship.type === "route" ? "Route" : "Relationship"}</strong><span>${escapeHtml(annotation.relationship.label)}</span></div>
         <ul class="floorplan-legend" aria-label="Highlighted floorplan regions">${legend}</ul>
         <p class="floorplan-safety-note">${escapeHtml(annotation.safetyNote)}</p>
         <div><a href="${escapeHtml(floorplan.imageUrl)}" target="_blank" rel="noopener">Open full size</a><a href="${escapeHtml(floorplan.imageUrl)}" download>Download image</a></div>
