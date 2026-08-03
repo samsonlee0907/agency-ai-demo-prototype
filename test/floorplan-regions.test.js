@@ -77,6 +77,7 @@ test("toilet and wayfinding questions have authoritative fallback intents", () =
     ["Where is the men's washroom?", ["toilets", "passage"], "location"],
     ["Is the ladies washroom next to the passage?", ["toilets", "passage"], "adjacency"],
     ["Where's the stairs?", ["central_stairs", "storage_west", "storage_east"], "location"],
+    ["Where is the restaurant relative to the central stairs?", ["restaurant", "central_stairs"], "direction"],
     ["How do I get from reception to the restaurant?", ["restaurant", "reception"], "direction"],
     ["Navigate me from the toilets to reception.", ["reception", "toilets"], "direction"],
     ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"], "direction"],

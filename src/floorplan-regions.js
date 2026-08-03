@@ -316,6 +316,7 @@ function mentionedRegionIds(normalized) {
 export function floorplanAnnotationFallbackForMessage(message) {
   const normalized = String(message || "").toLowerCase();
   const select = (regionId, role, reason) => ({ regionId, role, reason });
+  const regionIds = mentionedRegionIds(normalized);
   const mentionsToilets = /\b(toilets?|washrooms?|bathrooms?)\b/.test(normalized);
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
   const asksForUnsupportedFixtureCount = asksForCount
@@ -361,7 +362,22 @@ export function floorplanAnnotationFallbackForMessage(message) {
       }
     };
   }
-  if (/\b(where|locate|find)\b/.test(normalized) && /\bstairs?\b/.test(normalized)) {
+  if (/\brelative to\b/.test(normalized) && regionIds.length >= 2) {
+    const [targetRegionId, referenceRegionId] = regionIds;
+    return {
+      selections: [
+        select(targetRegionId, "primary", "This is the requested location."),
+        select(referenceRegionId, "secondary", "This is the requested spatial reference.")
+      ],
+      relationship: {
+        type: "direction",
+        fromRegionId: referenceRegionId,
+        toRegionId: targetRegionId,
+        direction: null
+      }
+    };
+  }
+  if (/\b(where|locate|find)\b/.test(normalized) && /\bstairs?\b/.test(normalized) && regionIds.length === 1) {
     return {
       selections: [
         select("central_stairs", "primary", "This is the requested central stair core."),
@@ -377,7 +393,6 @@ export function floorplanAnnotationFallbackForMessage(message) {
     };
   }
   if (wayfindingPattern.test(normalized)) {
-    const regionIds = mentionedRegionIds(normalized);
     if (regionIds.length >= 2) {
       const [fromRegionId, toRegionId] = regionIds;
       return {

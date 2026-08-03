@@ -94,16 +94,19 @@ export function groundTenantFloorplan(result, floorplan, allowAnnotation = true,
   let annotation = null;
   try {
     if (allowAnnotation) {
+      let modelAnnotation = null;
       try {
-        annotation = groundFloorplanAnnotation(
+        modelAnnotation = groundFloorplanAnnotation(
           floorplan.asset.id,
-          modelAttachment.annotation ?? fallbackIntent
+          modelAttachment.annotation
         );
       } catch (error) {
         const recoverableRelationshipError = /relationship|endpoint|direction|adjacency marker/.test(error.message);
         if (!fallbackIntent || !recoverableRelationshipError) throw error;
-        annotation = groundFloorplanAnnotation(floorplan.asset.id, fallbackIntent);
       }
+      annotation = fallbackIntent
+        ? groundFloorplanAnnotation(floorplan.asset.id, fallbackIntent)
+        : modelAnnotation;
     }
   } catch (error) {
     throw new ModelResponseError(`GPT returned an invalid floorplan annotation: ${error.message}`, error);
