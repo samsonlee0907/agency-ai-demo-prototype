@@ -255,6 +255,34 @@ test("tenant floorplan grounding rejects unknown model asset identifiers", () =>
   );
 });
 
+test("tenant floorplan grounding uses an authoritative fallback when visual intent is null", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const fallbackIntent = {
+    selections: [
+      { regionId: "toilets", role: "primary", reason: "This is the requested washroom area." }
+    ],
+    relationship: {
+      type: "count",
+      fromRegionId: null,
+      toRegionId: null,
+      direction: null
+    }
+  };
+  const grounded = groundTenantFloorplan(
+    assistantResponse({
+      included: true,
+      assetId: floorplan.id,
+      caption: "The washroom area is highlighted.",
+      annotation: null
+    }),
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" },
+    true,
+    fallbackIntent
+  );
+  assert.deepEqual(grounded.floorplan.annotation.regions.map((region) => region.id), ["toilets"]);
+  assert.equal(grounded.floorplan.annotation.relationship.type, "count");
+});
+
 test("tenant floorplan grounding rejects unknown model region identifiers", () => {
   const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
   assert.throws(

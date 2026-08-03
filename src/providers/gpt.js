@@ -6,7 +6,11 @@ import {
   emptyFloorplanAttachment,
   floorplanAnnotationRequested
 } from "../floorplan-assets.js";
-import { floorplanCatalogForModel, groundFloorplanAnnotation } from "../floorplan-regions.js";
+import {
+  floorplanAnnotationFallbackForMessage,
+  floorplanCatalogForModel,
+  groundFloorplanAnnotation
+} from "../floorplan-regions.js";
 import {
   ASSISTANT_REPLY_MAX_LENGTH,
   assistantJsonSchema,
@@ -72,7 +76,7 @@ export function normalizeAssistantFollowUps(result, history = []) {
   };
 }
 
-export function groundTenantFloorplan(result, floorplan, allowAnnotation = true) {
+export function groundTenantFloorplan(result, floorplan, allowAnnotation = true, fallbackIntent = null) {
   const modelAttachment = result.floorplan;
   if (!floorplan) {
     if (modelAttachment.included || modelAttachment.assetId || modelAttachment.annotation !== null) {
@@ -89,7 +93,10 @@ export function groundTenantFloorplan(result, floorplan, allowAnnotation = true)
   let annotation = null;
   try {
     if (allowAnnotation) {
-      annotation = groundFloorplanAnnotation(floorplan.asset.id, modelAttachment.annotation);
+      annotation = groundFloorplanAnnotation(
+        floorplan.asset.id,
+        modelAttachment.annotation ?? fallbackIntent
+      );
     }
   } catch (error) {
     throw new ModelResponseError(`GPT returned an invalid floorplan annotation: ${error.message}`, error);
@@ -327,6 +334,9 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
     },
     async respondToTenant(building, message, history, floorplan = null) {
       const annotationRequested = floorplan ? floorplanAnnotationRequested(message) : false;
+      const annotationFallback = annotationRequested
+        ? floorplanAnnotationFallbackForMessage(message)
+        : null;
       const buildingContext = {
         ...building,
         floorplans: floorplan ? [floorplan.asset] : []
@@ -344,7 +354,12 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
           ? [{ type: "input_image", image_url: floorplan.dataUrl, detail: "original" }]
           : []
       });
-      const grounded = groundTenantFloorplan(result, floorplan, annotationRequested);
+      const grounded = groundTenantFloorplan(
+        result,
+        floorplan,
+        annotationRequested,
+        annotationFallback
+      );
       const normalized = ensureEmergencyGuidance(normalizeAssistantFollowUps(
         grounded,
         [...history, { role: "user", content: message }]
