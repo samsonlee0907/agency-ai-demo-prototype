@@ -1,6 +1,11 @@
 import { comparableSales, findBuilding, findLease, findListing, findLead, listings } from "./data.js";
 import { filterSuggestedReplies } from "./assistant-conversation.js";
-import { buildFloorplanAttachment, emptyFloorplanAttachment, findFloorplanForMessage } from "./floorplan-assets.js";
+import {
+  buildFloorplanAttachment,
+  emptyFloorplanAttachment,
+  findFloorplanForMessage,
+  floorplanAnnotationRequested
+} from "./floorplan-assets.js";
 import { groundFloorplanAnnotation } from "./floorplan-regions.js";
 import { esgPortfolio, findMaintenanceAsset } from "./operations-data.js";
 
@@ -651,6 +656,12 @@ function floorplanIntent(selections, type, fromRegionId = null, toRegionId = nul
 
 function mockFloorplanAnswer(normalized) {
   const select = (regionId, role, reason) => ({ regionId, role, reason });
+  const plainPlan = () => ({
+    reply: "The Level 12 plan shows three office areas around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east. The original plan is shown without a highlight.",
+    caption: "Meridian House Level 12 orientation plan shown without an inferred highlight.",
+    annotation: null
+  });
+  if (!floorplanAnnotationRequested(normalized)) return plainPlan();
   if (/64\.2/.test(normalized) && /(closer|closest|adjacent)/.test(normalized) && /restaurant/.test(normalized)) {
     return {
       reply: "The eastern 64.2 m² office is closer because it directly adjoins the restaurant. The western 64.2 m² office is separated from the restaurant by the eastern office.",
@@ -746,11 +757,7 @@ function mockFloorplanAnswer(normalized) {
       ], "direction", "office_114_4", "restaurant", "east")
     };
   }
-  return {
-    reply: "The Level 12 plan shows three office areas around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east. No single validated region confidently matches this broad request, so the original plan is shown without a highlight.",
-    caption: "Meridian House Level 12 orientation plan shown without an inferred highlight.",
-    annotation: null
-  };
+  return plainPlan();
 }
 
 function answerTenantNonEmergency(building, normalized) {
