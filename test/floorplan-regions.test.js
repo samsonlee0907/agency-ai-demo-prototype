@@ -89,7 +89,7 @@ test("grounding substitutes authoritative region labels and source-pixel geometr
   assert.match(annotation.relationship.label, /Restaurant is northeast of Central stairs/);
 });
 
-test("grounding rejects unknown, duplicate and inconsistent region selections", () => {
+test("grounding rejects unknown and duplicate region selections", () => {
   assert.throws(
     () => groundFloorplanAnnotation(assetId, {
       selections: [selection("invented-region")],
@@ -104,13 +104,44 @@ test("grounding rejects unknown, duplicate and inconsistent region selections", 
     }),
     /Duplicate floorplan region/
   );
-  assert.throws(
-    () => groundFloorplanAnnotation(assetId, {
-      selections: [selection("restaurant"), selection("central_stairs", "secondary")],
-      relationship: { type: "direction", fromRegionId: "central_stairs", toRegionId: "restaurant", direction: null }
-    }),
-    /require a direction/
-  );
+});
+
+test("grounding discards irrelevant endpoints for count and size relationships", () => {
+  for (const type of ["count", "size"]) {
+    const annotation = groundFloorplanAnnotation(assetId, {
+      selections: [selection("toilets")],
+      relationship: {
+        type,
+        fromRegionId: "toilets",
+        toRegionId: null,
+        direction: "west"
+      }
+    });
+    assert.deepEqual(annotation.relationship, {
+      type,
+      fromRegionId: null,
+      toRegionId: null,
+      direction: null,
+      label: type === "count" ? "1 highlighted regions" : "Highlighted size comparison"
+    });
+    assert.equal(annotation.regions[0].id, "toilets");
+    assert.equal(annotation.marker, null);
+  }
+});
+
+test("grounding derives omitted directions from authoritative region geometry", () => {
+  const annotation = groundFloorplanAnnotation(assetId, {
+    selections: [selection("restaurant"), selection("central_stairs", "secondary")],
+    relationship: {
+      type: "location",
+      fromRegionId: "central_stairs",
+      toRegionId: "restaurant",
+      direction: null
+    }
+  });
+  assert.equal(annotation.relationship.direction, "northeast");
+  assert.match(annotation.relationship.label, /Restaurant is northeast of Central stairs/);
+  assert.equal(annotation.marker.kind, "direction-arrow");
 });
 
 test("grounding uses only approved adjacency and transition markers", () => {

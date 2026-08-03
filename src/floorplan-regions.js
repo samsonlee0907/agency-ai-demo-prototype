@@ -311,6 +311,15 @@ function adjacencyKey(first, second) {
   return [first, second].sort().join(":");
 }
 
+function directionBetweenRegions(from, to) {
+  const fromCenter = polygonCentroid(from.polygon);
+  const toCenter = polygonCentroid(to.polygon);
+  const angle = Math.atan2(toCenter.y - fromCenter.y, toCenter.x - fromCenter.x);
+  const directions = ["east", "southeast", "south", "southwest", "west", "northwest", "north", "northeast"];
+  const sector = Math.round(angle / (Math.PI / 4));
+  return directions[(sector + directions.length) % directions.length];
+}
+
 function relationshipLabel(relationship, regions, transition) {
   const byId = new Map(regions.map((region) => [region.id, region]));
   const from = byId.get(relationship.fromRegionId);
@@ -334,13 +343,17 @@ export function groundFloorplanAnnotation(assetId, intent) {
     throw new Error("At least one primary floorplan region is required.");
   }
 
-  const { relationship } = intent;
+  let relationship = ["count", "size"].includes(intent.relationship.type)
+    ? {
+        ...intent.relationship,
+        fromRegionId: null,
+        toRegionId: null,
+        direction: null
+      }
+    : intent.relationship;
   const requiresEndpoints = ["location", "adjacency", "direction"].includes(relationship.type);
   const hasBothEndpoints = relationship.fromRegionId !== null && relationship.toRegionId !== null;
   if (requiresEndpoints && !hasBothEndpoints) throw new Error("This floorplan relationship requires two region endpoints.");
-  if (!requiresEndpoints && (relationship.fromRegionId === null) !== (relationship.toRegionId === null)) {
-    throw new Error("Floorplan relationship endpoints must be supplied as a pair.");
-  }
   if (hasBothEndpoints) {
     if (relationship.fromRegionId === relationship.toRegionId) throw new Error("Floorplan relationship endpoints must be different.");
     if (!selectedIds.includes(relationship.fromRegionId) || !selectedIds.includes(relationship.toRegionId)) {
@@ -348,12 +361,14 @@ export function groundFloorplanAnnotation(assetId, intent) {
     }
   }
   if (["location", "direction"].includes(relationship.type) && relationship.direction === null) {
-    throw new Error("Directional floorplan relationships require a direction.");
+    relationship = {
+      ...relationship,
+      direction: directionBetweenRegions(
+        regionsById.get(relationship.fromRegionId),
+        regionsById.get(relationship.toRegionId)
+      )
+    };
   }
-  if (["count", "size"].includes(relationship.type) && relationship.direction !== null) {
-    throw new Error("Count and size relationships cannot include a direction.");
-  }
-
   const regions = intent.selections.map((selection) => {
     const region = regionsById.get(selection.regionId);
     return {
