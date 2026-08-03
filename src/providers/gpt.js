@@ -9,7 +9,8 @@ import {
 import {
   floorplanAnnotationFallbackForMessage,
   floorplanCatalogForModel,
-  groundFloorplanAnnotation
+  groundFloorplanAnnotation,
+  groundFloorplanReply
 } from "../floorplan-regions.js";
 import {
   ASSISTANT_REPLY_MAX_LENGTH,
@@ -93,10 +94,16 @@ export function groundTenantFloorplan(result, floorplan, allowAnnotation = true,
   let annotation = null;
   try {
     if (allowAnnotation) {
-      annotation = groundFloorplanAnnotation(
-        floorplan.asset.id,
-        modelAttachment.annotation ?? fallbackIntent
-      );
+      try {
+        annotation = groundFloorplanAnnotation(
+          floorplan.asset.id,
+          modelAttachment.annotation ?? fallbackIntent
+        );
+      } catch (error) {
+        const recoverableRelationshipError = /relationship|endpoint|direction|adjacency marker/.test(error.message);
+        if (!fallbackIntent || !recoverableRelationshipError) throw error;
+        annotation = groundFloorplanAnnotation(floorplan.asset.id, fallbackIntent);
+      }
     }
   } catch (error) {
     throw new ModelResponseError(`GPT returned an invalid floorplan annotation: ${error.message}`, error);
@@ -360,6 +367,7 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
         annotationRequested,
         annotationFallback
       );
+      grounded.reply = groundFloorplanReply(message, grounded.reply);
       const normalized = ensureEmergencyGuidance(normalizeAssistantFollowUps(
         grounded,
         [...history, { role: "user", content: message }]

@@ -115,6 +115,38 @@ test("tenant assistant Mock mode annotates count and size evidence deterministic
   assert.equal(size.floorplan.annotation.regions[0].areaSqm, 114.4);
 });
 
+test("tenant assistant grounds toilet variants and safe wayfinding overlays", () => {
+  const toiletScenarios = [
+    ["How many toilets does the ladies washroom have?", /5 enclosed cubicles/, ["toilets"]],
+    ["How many cubicles are in the ladies washroom?", /5 enclosed cubicles/, ["toilets"]],
+    ["How many toilets are in the women's bathroom?", /5 enclosed cubicles/, ["toilets"]],
+    ["How many washrooms are shown on Level 12?", /one labelled toilet area/, ["toilets"]],
+    ["Where is the ladies washroom?", /does not designate separate ladies or men's/, ["toilets", "passage"]],
+    ["Is the ladies washroom next to the passage?", /immediately west of the labelled Passage/, ["toilets", "passage"]],
+    ["How many sinks are in the ladies washroom?", /does not provide an authoritative count/, ["toilets", "passage"]],
+    ["Where is the men's washroom?", /does not designate separate ladies or men's/, ["toilets", "passage"]]
+  ];
+  for (const [message, replyPattern, regionIds] of toiletScenarios) {
+    const result = answerTenant("building-meridian", message);
+    assert.match(result.reply, replyPattern, message);
+    assert.deepEqual(result.floorplan.annotation.regions.map((region) => region.id), regionIds, message);
+  }
+
+  const wayfindingScenarios = [
+    ["How do I get from reception to the restaurant?", ["restaurant", "reception"]],
+    ["Show me the way from the central stairs to the restaurant.", ["restaurant", "central_stairs"]],
+    ["Navigate me from the toilets to reception.", ["reception", "toilets"]],
+    ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"]],
+    ["How do I get to the toilets?", ["toilets", "passage"]]
+  ];
+  for (const [message, regionIds] of wayfindingScenarios) {
+    const result = answerTenant("building-meridian", message);
+    assert.ok(["direction", "location"].includes(result.floorplan.annotation.relationship.type), message);
+    assert.deepEqual(result.floorplan.annotation.regions.map((region) => region.id), regionIds, message);
+    assert.match(result.floorplan.annotation.safetyNote, /not .*routing/i, message);
+  }
+});
+
 test("tenant assistant uses the plain plan for generic display requests", () => {
   const broad = answerTenant("building-meridian", "Show me the Level 12 floor plan and main amenities");
   const namedFeatures = answerTenant("building-meridian", "Show me the floor plan with the restaurant and stairs");
