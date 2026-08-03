@@ -70,6 +70,20 @@ test("model catalog exposes semantics without any renderer geometry", () => {
     basinCount: 2,
     urinalCount: 4
   });
+
+  assert.equal(toilets.position, "north-west");
+  assert.equal(modelCatalog.regions.find((region) => region.id === "kitchen").position, "south-east");
+  for (const region of modelCatalog.regions) {
+    assert.match(region.position, /^(north|south)?-?(west|east)?$|^central$/);
+  }
+
+  const relation = modelCatalog.relations.find((item) => item.regionIds.includes("toilets_gents"));
+  assert.deepEqual(relation.regionIds, ["toilets_gents", "toilets_ladies"]);
+  assert.match(relation.note, /toilets_ladies lies to the east of toilets_gents/);
+  for (const item of modelCatalog.relations) {
+    assert.equal(item.type, "adjacent");
+    for (const id of item.regionIds) assert.ok(FLOORPLAN_REGION_IDS.includes(id));
+  }
 });
 
 test("floorplan intent recognizes washroom and wayfinding wording without annotating generic display", () => {
@@ -110,7 +124,10 @@ test("toilet and wayfinding questions have authoritative fallback intents", () =
     ["Navigate me from the toilets to reception.", ["reception", "toilets"], "direction"],
     ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"], "direction"],
     ["How do I get to the toilets?", ["toilets", "passage"], "location"],
-    ["How do I get to the ladies washroom?", ["toilets_ladies", "passage"], "location"]
+    ["How do I get to the ladies washroom?", ["toilets_ladies", "passage"], "location"],
+    ["Which room is closest to the restaurant?", ["restaurant", "office_east_64_2"], "adjacency"],
+    ["What is adjacent to the restaurant?", ["restaurant", "office_east_64_2"], "adjacency"],
+    ["What is next to the toilets?", ["toilets", "passage"], "adjacency"]
   ];
   for (const [message, regionIds, relationship] of scenarios) {
     const intent = floorplanAnnotationFallbackForMessage(message);
@@ -158,7 +175,7 @@ test("toilet replies report the gendered facilities drawn on the plan", () => {
     "how to get to the male's washroom from the kitchen?",
     "Model supplied answer"
   );
-  assert.match(location, /Gents washroom is at the far western end/);
+  assert.match(location, /Gents washroom is the western room of the Toilets block/);
 });
 
 test("strict annotation schemas accept IDs and reject raw geometry", () => {

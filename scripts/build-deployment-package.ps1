@@ -52,7 +52,8 @@ try {
     "server.js",
     "public/index.html",
     "public/assets/documents/meridian-house-office-lease-demo.pdf",
-    "public/assets/floorplans/meridian-house-level-12-floorplan.jpeg"
+    "public/assets/floorplans/meridian-house-level-12-floorplan.jpeg",
+    "src/floorplan-index/meridian-house-level-12.json"
   )) {
     if (-not $entryNames.Contains($required)) {
       throw "Deployment package is missing required entry: $required"
