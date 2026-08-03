@@ -122,7 +122,7 @@ test("grounding discards irrelevant endpoints for count and size relationships",
       fromRegionId: null,
       toRegionId: null,
       direction: null,
-      label: type === "count" ? "1 highlighted regions" : "Highlighted size comparison"
+      label: type === "count" ? "Highlighted region for visual count" : "Highlighted size comparison"
     });
     assert.equal(annotation.regions[0].id, "toilets");
     assert.equal(annotation.marker, null);

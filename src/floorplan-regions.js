@@ -326,7 +326,10 @@ function relationshipLabel(relationship, regions, transition) {
   const to = byId.get(relationship.toRegionId);
   if (transition) return `${relationship.direction} along ${transition.label}; spatial direction only, not a route`;
   if (relationship.type === "adjacency") return `${from.label} directly adjoins ${to.label}`;
-  if (relationship.type === "count") return `${regions.filter((region) => region.role === "primary").length} highlighted regions`;
+  if (relationship.type === "count") {
+    const count = regions.filter((region) => region.role === "primary").length;
+    return count === 1 ? "Highlighted region for visual count" : `${count} highlighted regions`;
+  }
   if (relationship.type === "size") return "Highlighted size comparison";
   return `${to.label} is ${relationship.direction} of ${from.label}`;
 }
