@@ -124,6 +124,7 @@ test("tenant assistant grounds toilet variants and safe wayfinding overlays", ()
     ["Where is the ladies washroom?", /does not designate separate ladies or men's/, ["toilets", "passage"]],
     ["Is the ladies washroom next to the passage?", /immediately west of the labelled Passage/, ["toilets", "passage"]],
     ["How many sinks are in the ladies washroom?", /does not provide an authoritative count/, ["toilets", "passage"]],
+    ["How many urinals are shown?", /does not provide an authoritative count/, ["toilets", "passage"]],
     ["Where is the men's washroom?", /does not designate separate ladies or men's/, ["toilets", "passage"]]
   ];
   for (const [message, replyPattern, regionIds] of toiletScenarios) {

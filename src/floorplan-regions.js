@@ -317,7 +317,7 @@ export function floorplanAnnotationFallbackForMessage(message) {
   const normalized = String(message || "").toLowerCase();
   const select = (regionId, role, reason) => ({ regionId, role, reason });
   const regionIds = mentionedRegionIds(normalized);
-  const mentionsToilets = /\b(toilets?|washrooms?|bathrooms?)\b/.test(normalized);
+  const mentionsToilets = /\b(toilets?|washrooms?|bathrooms?|cubicles?|sinks?|basins?|urinals?|fixtures?)\b/.test(normalized);
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
   const asksForUnsupportedFixtureCount = asksForCount
     && /\b(sinks?|basins?|urinals?|fixtures?)\b/.test(normalized);

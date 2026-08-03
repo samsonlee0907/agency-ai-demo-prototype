@@ -74,6 +74,7 @@ test("toilet and wayfinding questions have authoritative fallback intents", () =
     ["how many toilets does the ladies washroom have?", ["toilets"], "count"],
     ["How many cubicles are in the ladies washroom?", ["toilets"], "count"],
     ["How many sinks are in the ladies washroom?", ["toilets", "passage"], "location"],
+    ["How many urinals are shown?", ["toilets", "passage"], "location"],
     ["Where is the men's washroom?", ["toilets", "passage"], "location"],
     ["Is the ladies washroom next to the passage?", ["toilets", "passage"], "adjacency"],
     ["Where's the stairs?", ["central_stairs", "storage_west", "storage_east"], "location"],
