@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   FLOORPLAN_REGION_IDS,
   findFloorplanRegionCatalog,
+  floorplanAnnotationFallbackForMessage,
   floorplanCatalogForModel,
   groundFloorplanAnnotation,
   validateFloorplanRegionCatalog
@@ -43,6 +44,23 @@ test("model catalog exposes semantics without any renderer geometry", () => {
   const serialized = JSON.stringify(modelCatalog);
   assert.equal(modelCatalog.regions.length, FLOORPLAN_REGION_IDS.length);
   assert.doesNotMatch(serialized, /polygon|labelAnchor|boundary|axis|coordinates/i);
+});
+
+test("unambiguous count and stairs questions have authoritative fallback intents", () => {
+  const count = floorplanAnnotationFallbackForMessage("how many toilets does the ladies washroom have?");
+  assert.deepEqual(count.selections.map((item) => item.regionId), ["toilets"]);
+  assert.equal(count.relationship.type, "count");
+
+  const stairs = floorplanAnnotationFallbackForMessage("Where's the stairs?");
+  assert.deepEqual(stairs.selections.map((item) => item.regionId), [
+    "central_stairs",
+    "storage_west",
+    "storage_east"
+  ]);
+  assert.equal(stairs.relationship.type, "location");
+
+  assert.equal(floorplanAnnotationFallbackForMessage("Show me the Level 12 floor plan"), null);
+  assert.equal(floorplanAnnotationFallbackForMessage("Where is the nearest lift?"), null);
 });
 
 test("strict annotation schemas accept IDs and reject raw geometry", () => {

