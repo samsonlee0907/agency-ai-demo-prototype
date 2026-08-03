@@ -122,9 +122,12 @@ test("tenant assistant resolves a follow-up pronoun from the conversation", () =
   ];
 
   const route = answerTenant("building-meridian", "how to reach it from the kitchen?", history);
-  assert.deepEqual(route.floorplan.annotation.regions.map((region) => region.id), ["toilets_gents", "kitchen"]);
-  assert.equal(route.floorplan.annotation.relationship.type, "direction");
-  assert.match(route.reply, /The Gents washroom is northwest of the Kitchen/);
+  assert.deepEqual(
+    route.floorplan.annotation.regions.map((region) => region.id),
+    ["toilets_gents", "kitchen", "reception", "restaurant", "verandah", "passage", "toilets"]
+  );
+  assert.equal(route.floorplan.annotation.relationship.type, "route");
+  assert.match(route.reply, /^From the Kitchen, head north through the service door into Reception/);
 
   const count = answerTenant("building-meridian", "how many cubicles does it have?", history);
   assert.deepEqual(count.floorplan.annotation.regions.map((region) => region.id), ["toilets_gents"]);
@@ -159,20 +162,20 @@ test("tenant assistant grounds toilet variants and safe wayfinding overlays", ()
   }
 
   const wayfindingScenarios = [
-    ["How do I get from reception to the restaurant?", ["restaurant", "reception"]],
-    ["Show me the way from the central stairs to the restaurant.", ["restaurant", "central_stairs"]],
-    ["Navigate me from the toilets to reception.", ["reception", "toilets"]],
-    ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"]],
-    ["how to get to the male's washroom from the kitchen?", ["toilets_gents", "kitchen"]],
-    ["How do I get to the ladies room from reception?", ["toilets_ladies", "reception"]],
-    ["Where is the kitchen?", ["kitchen", "reception"]],
-    ["How do I get to the toilets?", ["toilets", "passage"]]
+    ["How do I get from reception to the restaurant?", ["restaurant", "reception"], "route"],
+    ["Show me the way from the central stairs to the restaurant.", ["restaurant", "central_stairs", "verandah"], "route"],
+    ["Navigate me from the toilets to reception.", ["reception", "toilets", "passage", "verandah", "restaurant"], "route"],
+    ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs", "verandah"], "route"],
+    ["how to get to the male's washroom from the kitchen?", ["toilets_gents", "kitchen", "reception", "restaurant", "verandah", "passage", "toilets"], "route"],
+    ["How do I get to the ladies room from reception?", ["toilets_ladies", "reception", "restaurant", "verandah", "passage"], "route"],
+    ["Where is the kitchen?", ["kitchen", "reception"], "location"],
+    ["How do I get to the toilets?", ["toilets", "passage"], "location"]
   ];
-  for (const [message, regionIds] of wayfindingScenarios) {
+  for (const [message, regionIds, relationship] of wayfindingScenarios) {
     const result = answerTenant("building-meridian", message);
-    assert.ok(["direction", "location"].includes(result.floorplan.annotation.relationship.type), message);
+    assert.equal(result.floorplan.annotation.relationship.type, relationship, message);
     assert.deepEqual(result.floorplan.annotation.regions.map((region) => region.id), regionIds, message);
-    assert.match(result.floorplan.annotation.safetyNote, /not .*routing/i, message);
+    assert.match(result.floorplan.annotation.safetyNote, /not .*(routing|verified)/i, message);
   }
 });
 

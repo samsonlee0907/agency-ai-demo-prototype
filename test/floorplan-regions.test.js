@@ -7,6 +7,8 @@ import {
   floorplanCatalogForModel,
   groundFloorplanAnnotation,
   groundFloorplanReply,
+  verifyFloorplanReply,
+  floorplanRouteForModel,
   resolveFloorplanAnaphora,
   validateFloorplanRegionCatalog
 } from "../src/floorplan-regions.js";
@@ -118,12 +120,12 @@ test("toilet and wayfinding questions have authoritative fallback intents", () =
     ["Where is the gents?", ["toilets_gents", "toilets_ladies"], "location"],
     ["Where is the kitchen?", ["kitchen", "reception"], "location"],
     ["How many fixtures are in the toilets?", ["toilets"], "count"],
-    ["How do I get to the ladies room from reception?", ["toilets_ladies", "reception"], "direction"],
+    ["How do I get to the ladies room from reception?", ["toilets_ladies", "reception", "restaurant", "verandah", "passage"], "route"],
     ["Where is the restaurant relative to the central stairs?", ["restaurant", "central_stairs"], "direction"],
-    ["How do I get from reception to the restaurant?", ["restaurant", "reception"], "direction"],
-    ["how to get to the male's washroom from the kitchen?", ["toilets_gents", "kitchen"], "direction"],
-    ["Navigate me from the toilets to reception.", ["reception", "toilets"], "direction"],
-    ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs"], "direction"],
+    ["How do I get from reception to the restaurant?", ["restaurant", "reception"], "route"],
+    ["how to get to the male's washroom from the kitchen?", ["toilets_gents", "kitchen", "reception", "restaurant", "verandah", "passage", "toilets"], "route"],
+    ["Navigate me from the toilets to reception.", ["reception", "toilets", "passage", "verandah", "restaurant"], "route"],
+    ["Show a route from the stairs to the restaurant.", ["restaurant", "central_stairs", "verandah"], "route"],
     ["How do I get to the toilets?", ["toilets", "passage"], "location"],
     ["How do I get to the ladies washroom?", ["toilets_ladies", "passage"], "location"],
     ["Which room is closest to the restaurant?", ["restaurant", "office_east_64_2"], "adjacency"],
@@ -176,8 +178,9 @@ test("toilet replies report the gendered facilities drawn on the plan", () => {
     "how to get to the male's washroom from the kitchen?",
     "Model supplied answer"
   );
-  assert.match(location, /The Gents washroom is northwest of the Kitchen on the Level 12 plan/);
-  assert.match(location, /not a confirmed walking route/);
+  assert.match(location, /^From the Kitchen, head north through the service door into Reception/);
+  assert.match(location, /and finally head west through the door into the Gents washroom/);
+  assert.match(location, /not checked for step-free access, door locking or emergency egress/);
 
   const bare = groundFloorplanReply("where is the gents?", "Model supplied answer");
   assert.match(bare, /Gents washroom is the western room of the Toilets block/);
@@ -193,14 +196,17 @@ test("a follow-up pronoun resolves to the region the conversation was about", ()
   assert.equal(resolved, "how to reach the gents washroom from the kitchen?");
 
   const intent = floorplanAnnotationFallbackForMessage(resolved);
-  assert.deepEqual(intent.selections.map((item) => item.regionId), ["toilets_gents", "kitchen"]);
-  assert.equal(intent.relationship.type, "direction");
+  assert.deepEqual(
+    intent.selections.map((item) => item.regionId),
+    ["toilets_gents", "kitchen", "reception", "restaurant", "verandah", "passage", "toilets"]
+  );
+  assert.equal(intent.relationship.type, "route");
   assert.equal(intent.relationship.fromRegionId, "kitchen");
   assert.equal(intent.relationship.toRegionId, "toilets_gents");
   assert.doesNotThrow(() => groundFloorplanAnnotation(assetId, intent));
   assert.match(
     groundFloorplanReply(resolved, "Model supplied answer"),
-    /The Gents washroom is northwest of the Kitchen/
+    /^From the Kitchen, head north through the service door into Reception/
   );
 
   assert.equal(
@@ -383,4 +389,59 @@ test("grounding uses only approved adjacency and transition markers", () => {
     }),
     /approved adjacency/
   );
+});
+
+test("route annotations are drawn from server-owned doorways only", () => {
+  const intent = floorplanAnnotationFallbackForMessage("how do I get to the restaurant from the gents washroom?");
+  const annotation = groundFloorplanAnnotation(assetId, intent);
+  assert.equal(annotation.relationship.type, "route");
+  assert.equal(annotation.marker.kind, "route-path");
+  assert.equal(annotation.marker.points.length, annotation.regions.length + 1);
+  assert.match(annotation.relationship.label, /^Walking route from Gents washroom to Restaurant via /);
+  assert.match(annotation.safetyNote, /not verified for step-free access/);
+
+  // The model may name endpoints, but it can never smuggle in its own path.
+  const dropped = {
+    ...intent,
+    selections: intent.selections.filter((item) => item.role !== "context")
+  };
+  assert.throws(() => groundFloorplanAnnotation(assetId, dropped), /route passes through/);
+  assert.throws(
+    () => groundFloorplanAnnotation(assetId, {
+      selections: [selection("toilets_gents"), selection("verandah", "secondary")],
+      relationship: { type: "route", fromRegionId: "toilets_gents", toRegionId: "verandah", direction: null }
+    }),
+    /route passes through/
+  );
+});
+
+test("the model receives the resolved route without any geometry", () => {
+  const route = floorplanRouteForModel(assetId, "kitchen", "toilets_ladies");
+  assert.equal(route.fromRegionId, "kitchen");
+  assert.deepEqual(route.steps.map((step) => step.toRegionId), ["reception", "restaurant", "verandah", "passage", "toilets_ladies"]);
+  assert.ok(route.steps.every((step) => step.heading && step.via));
+  assert.doesNotMatch(JSON.stringify(route), /polygon|labelAnchor|"x"|"y"/i);
+  assert.equal(floorplanRouteForModel(assetId, "kitchen", "kitchen"), null);
+});
+
+test("model replies are kept when they agree with the index and replaced when they do not", () => {
+  const question = "How many cubicles are in the ladies washroom?";
+  const good = "The Ladies washroom has 3 enclosed cubicles alongside its run of 4 wash basins.";
+  assert.equal(verifyFloorplanReply(question, good), good);
+  assert.match(
+    verifyFloorplanReply(question, "The Ladies washroom has 6 enclosed cubicles."),
+    /Ladies washroom shows 3 enclosed toilet cubicles/
+  );
+
+  const wayfinding = "How do I get to the restaurant from the gents washroom?";
+  const narrated = "Step out of the Gents washroom into the Toilets lobby, follow the Passage east then south to the Verandah, and the Restaurant is straight ahead through the door.";
+  assert.equal(verifyFloorplanReply(wayfinding, narrated), narrated);
+  assert.match(
+    verifyFloorplanReply(wayfinding, "Head through Reception and the kitchen to reach the restaurant."),
+    /^From the Gents washroom, head southeast/
+  );
+  assert.match(verifyFloorplanReply(wayfinding, "   "), /^From the Gents washroom, head southeast/);
+
+  // Questions the index cannot adjudicate leave the model answer untouched.
+  assert.equal(verifyFloorplanReply("What is the balcony used for?", "It is an outdoor terrace."), "It is an outdoor terrace.");
 });

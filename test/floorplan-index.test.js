@@ -7,8 +7,10 @@ import {
   FLOORPLAN_FIXTURE_KINDS,
   pointInPolygon,
   validateFloorplanIndex,
+  distanceToPolygon,
   loadFloorplanIndexes
 } from "../src/floorplan-index.js";
+import { routeBetweenRegions } from "../src/floorplan-routing.js";
 
 const indexPath = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -101,4 +103,52 @@ test("the validator rejects fixtures and children that fall outside their room",
   const badRelation = readIndex();
   badRelation.relations.push({ type: "adjacent", regionIds: ["toilets", "nowhere"] });
   assert.ok(validateFloorplanIndex(badRelation).some((error) => error.includes("two known regions")));
+});
+
+test("every circulation link sits on a threshold shared by both rooms", () => {
+  const index = readIndex();
+  const regionsById = new Map(index.regions.map((region) => [region.id, region]));
+  const links = index.relations.filter((relation) => relation.type === "connects");
+  assert.ok(links.length >= 12, "the plan draws many doorways");
+  for (const link of links) {
+    for (const id of link.regionIds) {
+      assert.ok(
+        distanceToPolygon(link.at, regionsById.get(id).polygon) <= 20,
+        `${link.regionIds.join("/")} must touch ${id}`
+      );
+    }
+  }
+  // Every region the assistant can route to has to be reachable from the graph.
+  const connected = new Set(links.flatMap((link) => link.regionIds));
+  for (const region of index.regions) {
+    assert.ok(connected.has(region.id), `${region.id} has no drawn circulation link`);
+  }
+});
+
+test("the validator rejects doorways that do not touch the rooms they claim to join", () => {
+  const floating = readIndex();
+  const link = floating.relations.find((relation) => relation.type === "connects");
+  link.at = { x: link.at.x + 300, y: link.at.y };
+  assert.ok(validateFloorplanIndex(floating).some((error) => /threshold/.test(error)));
+
+  const duplicated = readIndex();
+  const original = duplicated.relations.find((relation) => relation.type === "connects");
+  duplicated.relations.push({ ...original, regionIds: [...original.regionIds].reverse() });
+  assert.ok(validateFloorplanIndex(duplicated).some((error) => /Duplicate connection/.test(error)));
+});
+
+test("routes only ever step between rooms the plan connects", () => {
+  const catalog = loadFloorplanIndexes()[0];
+  const linked = new Set(catalog.connections.map((link) => [...link.regionIds].sort().join(":")));
+  const route = routeBetweenRegions(catalog, "toilets_gents", "kitchen");
+  assert.deepEqual(route.regionIds, ["toilets_gents", "toilets", "passage", "verandah", "restaurant", "reception", "kitchen"]);
+  for (const leg of route.legs) {
+    assert.ok(linked.has([leg.fromRegionId, leg.toRegionId].sort().join(":")), `${leg.fromRegionId} to ${leg.toRegionId}`);
+  }
+  // Waypoints are the reviewed doorways, never a straight line through walls.
+  const doorways = new Set(catalog.connections.map((link) => `${link.at.x},${link.at.y}`));
+  for (const point of route.points.slice(1, -1)) {
+    assert.ok(doorways.has(`${point.x},${point.y}`), "every intermediate point is a drawn doorway");
+  }
+  assert.equal(routeBetweenRegions(catalog, "kitchen", "kitchen"), null);
 });

@@ -9,6 +9,8 @@ import {
 import {
   floorplanAnnotationFallbackForMessage,
   resolveFloorplanAnaphora,
+  floorplanRouteForMessage,
+  describeFloorplanRoute,
   groundFloorplanAnnotation,
   groundFloorplanReply
 } from "./floorplan-regions.js";
@@ -662,11 +664,22 @@ function floorplanIntent(selections, type, fromRegionId = null, toRegionId = nul
 function mockFloorplanAnswer(normalized) {
   const select = (regionId, role, reason) => ({ regionId, role, reason });
   const plainPlan = () => ({
-    reply: "The Level 12 plan shows three office areas around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east. The original plan is shown without a highlight.",
+    reply: "The Level 12 plan shows three office areas around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east.",
     caption: "Meridian House Level 12 orientation plan shown without an inferred highlight.",
-    annotation: null
+    annotation: null,
+    plain: true
   });
   if (!floorplanAnnotationRequested(normalized)) return plainPlan();
+  // Wayfinding is resolved from the shared circulation graph before any hand-written
+  // mock pairing, so Mock and Live draw and describe the same route.
+  const wayfinding = floorplanRouteForMessage(normalized);
+  if (wayfinding) {
+    return {
+      reply: describeFloorplanRoute(wayfinding.fromRegionId, wayfinding.toRegionId, wayfinding.route),
+      caption: "The walking route follows the doorways drawn on the plan, with each room it passes through highlighted.",
+      annotation: floorplanAnnotationFallbackForMessage(normalized)
+    };
+  }
   if (/64\.2/.test(normalized) && /(closer|closest|adjacent)/.test(normalized) && /restaurant/.test(normalized)) {
     return {
       reply: "The eastern 64.2 m² office is closer because it directly adjoins the restaurant. The western 64.2 m² office is separated from the restaurant by the eastern office.",
@@ -799,8 +812,13 @@ function answerTenantNonEmergency(building, normalized, history = []) {
     const caption = floorplanAnswer.annotation || !annotation
       ? floorplanAnswer.caption
       : "Validated floorplan regions highlighted for spatial orientation only.";
+    // Only claim the plan is unhighlighted when it really is.
+    const grounded = groundFloorplanReply(grounding, floorplanAnswer.reply);
+    const reply = floorplanAnswer.plain && !annotation
+      ? `${grounded} The original plan is shown without a highlight.`
+      : grounded;
     return {
-      reply: `${groundFloorplanReply(grounding, floorplanAnswer.reply)} The static plan does not verify accessibility, obstructions or emergency routes; use posted signage and warden directions for those needs.`,
+      reply: `${reply} The static plan does not verify accessibility, obstructions or emergency routes; use posted signage and warden directions for those needs.`,
       category: "Building information",
       urgency: "Routine",
       recommendedAction: annotation

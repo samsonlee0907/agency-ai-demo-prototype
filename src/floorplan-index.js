@@ -6,6 +6,10 @@ const indexDirectory = join(dirname(fileURLToPath(import.meta.url)), "floorplan-
 
 export const FLOORPLAN_FIXTURE_KINDS = Object.freeze(["wc", "urinal", "basin"]);
 
+// Doorway points are read off the raster by eye, so a small tolerance is allowed when
+// checking that a threshold really touches both of the regions it joins.
+const CONNECTION_TOLERANCE = 20;
+
 export function pointInPolygon(point, polygon) {
   let inside = false;
   for (let current = 0, previous = polygon.length - 1; current < polygon.length; previous = current, current += 1) {
@@ -21,6 +25,21 @@ export function pointInPolygon(point, polygon) {
 
 function fixturesInside(region, fixtures) {
   return fixtures.filter((fixture) => pointInPolygon(fixture.at, region.polygon));
+}
+
+function distanceToSegment(point, a, b) {
+  const spanX = b.x - a.x;
+  const spanY = b.y - a.y;
+  const lengthSquared = spanX * spanX + spanY * spanY;
+  const ratio = lengthSquared === 0
+    ? 0
+    : Math.max(0, Math.min(1, ((point.x - a.x) * spanX + (point.y - a.y) * spanY) / lengthSquared));
+  return Math.hypot(point.x - (a.x + ratio * spanX), point.y - (a.y + ratio * spanY));
+}
+
+export function distanceToPolygon(point, polygon) {
+  if (pointInPolygon(point, polygon)) return 0;
+  return Math.min(...polygon.map((vertex, index) => distanceToSegment(point, vertex, polygon[(index + 1) % polygon.length])));
 }
 
 // Counts are never authored in the index: they are computed by testing which
@@ -76,7 +95,26 @@ export function validateFloorplanIndex(index) {
       || relation.regionIds.length !== 2
       || relation.regionIds.some((id) => !regionsById.has(id))) {
       errors.push("Relations must reference two known regions.");
+      continue;
     }
+    if (relation.type !== "connects") continue;
+    if (relation.regionIds[0] === relation.regionIds[1]) {
+      errors.push("A connects relation must join two different regions.");
+      continue;
+    }
+    // A doorway is only trustworthy if it really sits on the threshold between the two
+    // regions it claims to join, so the route search can never cross a drawn wall.
+    for (const id of relation.regionIds) {
+      if (distanceToPolygon(relation.at, regionsById.get(id).polygon) > CONNECTION_TOLERANCE) {
+        errors.push(`Connection ${relation.regionIds.join("/")} is not on the threshold of ${id}.`);
+      }
+    }
+  }
+  const connectionKeys = new Set();
+  for (const relation of (index?.relations || []).filter((item) => item.type === "connects")) {
+    const key = [...relation.regionIds].sort().join(":");
+    if (connectionKeys.has(key)) errors.push(`Duplicate connection between ${key}.`);
+    connectionKeys.add(key);
   }
   return errors;
 }
@@ -109,7 +147,10 @@ function toCatalog(index) {
     fixtures,
     adjacencies: (index.relations || [])
       .filter((relation) => relation.type === "adjacent")
-      .map((relation) => ({ regionIds: relation.regionIds, boundary: relation.boundary }))
+      .map((relation) => ({ regionIds: relation.regionIds, boundary: relation.boundary })),
+    connections: (index.relations || [])
+      .filter((relation) => relation.type === "connects")
+      .map((relation) => ({ regionIds: relation.regionIds, via: relation.via || "opening", at: relation.at }))
   };
 }
 
