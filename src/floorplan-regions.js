@@ -1,194 +1,15 @@
+import { loadFloorplanIndexes } from "./floorplan-index.js";
+
 export const FLOORPLAN_REGION_SCALE = 1000;
 
-export const FLOORPLAN_REGION_IDS = Object.freeze([
-  "reception",
-  "restaurant",
-  "office_west_64_2",
-  "office_east_64_2",
-  "office_114_4",
-  "verandah",
-  "central_stairs",
-  "storage_west",
-  "storage_east",
-  "toilets",
-  "toilets_gents",
-  "toilets_ladies",
-  "passage",
-  "kitchen"
-]);
+// Regions, fixtures and relations are loaded from reviewed floorplan index
+// artifacts under src/floorplan-index. No plan fact is authored in code: region
+// facts such as cubicle, basin and urinal counts are derived from fixture points.
+const indexCatalogs = loadFloorplanIndexes();
 
-// Coordinates are transcribed from the visually verified Terra experiment overlays.
-const meridianLevel12Catalog = {
-  id: "meridian-house-level-12",
-  assetId: "floorplan-meridian-level-12",
-  source: { width: 2256, height: 1304 },
-  scale: FLOORPLAN_REGION_SCALE,
-  regions: [
-    {
-      id: "reception",
-      label: "Reception",
-      type: "room",
-      description: "The labelled reception room directly below the restaurant.",
-      polygon: [{ x: 738, y: 648 }, { x: 850, y: 648 }, { x: 850, y: 745 }, { x: 738, y: 745 }],
-      labelAnchor: { x: 794, y: 697 }
-    },
-    {
-      id: "restaurant",
-      label: "Restaurant",
-      type: "room",
-      areaSqm: 207.2,
-      description: "The complete labelled restaurant footprint, excluding the balcony, bar, reception, kitchen and changing rooms.",
-      polygon: [
-        { x: 689, y: 238 }, { x: 950, y: 238 }, { x: 950, y: 374 }, { x: 903, y: 374 },
-        { x: 903, y: 618 }, { x: 738, y: 618 }, { x: 738, y: 547 }, { x: 689, y: 547 }
-      ],
-      labelAnchor: { x: 820, y: 500 }
-    },
-    {
-      id: "office_west_64_2",
-      label: "West office 64.2 m²",
-      type: "room",
-      areaSqm: 64.2,
-      description: "The western or left office labelled 64.2 m².",
-      polygon: [{ x: 283, y: 239 }, { x: 492, y: 239 }, { x: 492, y: 544 }, { x: 283, y: 544 }],
-      labelAnchor: { x: 387, y: 392 }
-    },
-    {
-      id: "office_east_64_2",
-      label: "East office 64.2 m²",
-      type: "room",
-      areaSqm: 64.2,
-      description: "The eastern or right office labelled 64.2 m², immediately beside the restaurant.",
-      polygon: [{ x: 493, y: 239 }, { x: 699, y: 239 }, { x: 699, y: 544 }, { x: 493, y: 544 }],
-      labelAnchor: { x: 596, y: 392 }
-    },
-    {
-      id: "office_114_4",
-      label: "Largest office 114.4 m²",
-      type: "room",
-      areaSqm: 114.4,
-      description: "The largest labelled office in the lower-left of the plan.",
-      polygon: [
-        { x: 34, y: 382 }, { x: 222, y: 382 }, { x: 222, y: 663 }, { x: 248, y: 663 },
-        { x: 248, y: 966 }, { x: 81, y: 966 }, { x: 81, y: 928 }, { x: 34, y: 928 }
-      ],
-      labelAnchor: { x: 141, y: 700 }
-    },
-    {
-      id: "verandah",
-      label: "Verandah",
-      type: "transition",
-      description: "The labelled horizontal transition strip along the office fronts toward the restaurant.",
-      polygon: [{ x: 281, y: 544 }, { x: 738, y: 544 }, { x: 738, y: 666 }, { x: 281, y: 666 }],
-      labelAnchor: { x: 510, y: 605 },
-      axis: [{ x: 320, y: 605 }, { x: 700, y: 605 }],
-      directionRegionIds: ["office_114_4", "restaurant"]
-    },
-    {
-      id: "central_stairs",
-      label: "Central stairs",
-      type: "circulation",
-      description: "The central stair core between the two storage rooms.",
-      polygon: [{ x: 477, y: 620 }, { x: 521, y: 620 }, { x: 521, y: 782 }, { x: 477, y: 782 }],
-      labelAnchor: { x: 499, y: 701 }
-    },
-    {
-      id: "storage_west",
-      label: "West stair storage",
-      type: "service",
-      description: "The storage room immediately left of the central stairs.",
-      polygon: [{ x: 433, y: 621 }, { x: 467, y: 621 }, { x: 467, y: 780 }, { x: 433, y: 780 }],
-      labelAnchor: { x: 450, y: 701 }
-    },
-    {
-      id: "storage_east",
-      label: "East stair storage",
-      type: "service",
-      description: "The storage room immediately right of the central stairs.",
-      polygon: [{ x: 520, y: 621 }, { x: 553, y: 621 }, { x: 553, y: 780 }, { x: 520, y: 780 }],
-      labelAnchor: { x: 537, y: 701 }
-    },
-    {
-      id: "toilets",
-      label: "Toilets",
-      type: "service",
-      description: "The complete western block labelled Toilets beside the passage. It contains the labelled Gents washroom at its western end and the labelled Ladies washroom to the east of the Gents.",
-      facts: {
-        genderDesignation: "separate gents and ladies washrooms",
-        enclosedCubicleCount: 5,
-        totalFixtureCount: 15,
-        basinCount: 6,
-        urinalCount: 4
-      },
-      polygon: [{ x: 35, y: 137 }, { x: 227, y: 137 }, { x: 227, y: 384 }, { x: 35, y: 384 }],
-      labelAnchor: { x: 131, y: 261 }
-    },
-    {
-      id: "toilets_gents",
-      label: "Gents washroom",
-      type: "service",
-      description: "The labelled Gents washroom at the western end of the Toilets block, beyond the Ladies washroom.",
-      facts: {
-        genderDesignation: "gents",
-        enclosedCubicleCount: 2,
-        totalFixtureCount: 8,
-        basinCount: 2,
-        urinalCount: 4
-      },
-      polygon: [{ x: 39, y: 147 }, { x: 114, y: 147 }, { x: 114, y: 376 }, { x: 39, y: 376 }],
-      labelAnchor: { x: 76, y: 261 }
-    },
-    {
-      id: "toilets_ladies",
-      label: "Ladies washroom",
-      type: "service",
-      description: "The labelled Ladies washroom in the eastern half of the Toilets block, immediately west of the passage.",
-      facts: {
-        genderDesignation: "ladies",
-        enclosedCubicleCount: 3,
-        totalFixtureCount: 7,
-        basinCount: 4,
-        urinalCount: 0
-      },
-      polygon: [{ x: 119, y: 147 }, { x: 218, y: 147 }, { x: 218, y: 307 }, { x: 119, y: 307 }],
-      labelAnchor: { x: 168, y: 227 }
-    },
-    {
-      id: "passage",
-      label: "Passage",
-      type: "circulation",
-      description: "The labelled north-south passage between the toilets and office areas.",
-      polygon: [{ x: 220, y: 232 }, { x: 282, y: 232 }, { x: 282, y: 670 }, { x: 220, y: 670 }],
-      labelAnchor: { x: 251, y: 451 }
-    },
-    {
-      id: "kitchen",
-      label: "Kitchen",
-      type: "service",
-      description: "The labelled kitchen below and slightly right of reception.",
-      polygon: [{ x: 741, y: 779 }, { x: 846, y: 779 }, { x: 846, y: 957 }, { x: 741, y: 957 }],
-      labelAnchor: { x: 794, y: 868 }
-    }
-  ],
-  adjacencies: [
-    {
-      regionIds: ["office_east_64_2", "restaurant"],
-      boundary: [{ x: 699, y: 270 }, { x: 699, y: 520 }]
-    },
-    {
-      regionIds: ["toilets", "passage"],
-      boundary: [{ x: 224, y: 232 }, { x: 224, y: 384 }]
-    },
-    {
-      regionIds: ["toilets_ladies", "passage"],
-      boundary: [{ x: 219, y: 232 }, { x: 219, y: 307 }]
-    },
-    {
-      regionIds: ["toilets_gents", "toilets_ladies"],
-      boundary: [{ x: 116, y: 147 }, { x: 116, y: 307 }]
-    }
-  ]
-};
+export const FLOORPLAN_REGION_IDS = Object.freeze(
+  indexCatalogs.flatMap((catalog) => catalog.regions.map((region) => region.id))
+);
 
 function deepFreeze(value) {
   if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -305,7 +126,7 @@ export function validateFloorplanRegionCatalog(catalog) {
   return errors;
 }
 
-const catalogs = deepFreeze([meridianLevel12Catalog]);
+const catalogs = deepFreeze(indexCatalogs);
 for (const catalog of catalogs) {
   const errors = validateFloorplanRegionCatalog(catalog);
   if (errors.length) throw new Error(`Invalid floorplan region catalog: ${errors.join(" ")}`);
@@ -323,15 +144,40 @@ export function floorplanCatalogForModel(assetId) {
   return {
     id: catalog.id,
     assetId: catalog.assetId,
-    regions: catalog.regions.map(({ id, label, type, areaSqm = null, description, facts = null }) => ({
+    note: "This index was segmented and verified against the plan image. Treat its labels, counts and spatial relations as authoritative and never re-count or re-estimate them from the picture.",
+    regions: catalog.regions.map(({ id, label, type, parentId = null, areaSqm = null, description, facts = null, polygon }) => ({
       id,
       label,
       type,
+      parentId,
       areaSqm,
       description,
-      facts
+      facts,
+      position: planPosition(catalog, polygon)
+    })),
+    relations: (catalog.adjacencies || []).map(({ regionIds }) => ({
+      type: "adjacent",
+      regionIds,
+      note: `${regionIds[1]} lies to the ${relativeSide(findRegionById(regionIds[1]), findRegionById(regionIds[0]))} of ${regionIds[0]}.`
     }))
   };
+}
+
+// Coarse ninth-of-the-plan placement so the model can speak about position without
+// ever receiving drawing geometry.
+function planPosition(catalog, polygon) {
+  const all = catalog.regions.flatMap((region) => region.polygon);
+  const plan = boundingBox(all);
+  const centre = polygonCentroid(polygon);
+  const band = (value, min, max, low, high) => {
+    const span = (max - min) / 3;
+    if (value < min + span) return low;
+    if (value > max - span) return high;
+    return "";
+  };
+  const vertical = band(centre.y, plan.minY, plan.maxY, "north", "south");
+  const horizontal = band(centre.x, plan.minX, plan.maxX, "west", "east");
+  return [vertical, horizontal].filter(Boolean).join("-") || "central";
 }
 
 const wayfindingPattern = /\b(wayfinding|navigate|navigation|route|directions?|which way|show me the way)\b|\bhow (?:do|can|would|should) i get\b|\bhow to (?:get|reach|find)\b|\bget (?:to|from)\b|\bway (?:to|from)\b/;
@@ -397,13 +243,76 @@ function wayfindingEndpoints(normalized, regionIds) {
   return { fromRegionId: first, toRegionId: second };
 }
 
-const toiletFacilityFacts = Object.freeze({
-  toilets_ladies: { label: "Ladies washroom", cubicles: 3, basins: 4, urinals: 0 },
-  toilets_gents: { label: "Gents washroom", cubicles: 2, basins: 2, urinals: 4 },
-  toilets: { label: "Toilets block", cubicles: 5, basins: 6, urinals: 4 }
-});
+function findRegionById(regionId) {
+  for (const catalog of catalogs) {
+    const region = catalog.regions.find((item) => item.id === regionId);
+    if (region) return region;
+  }
+  return null;
+}
 
-const toiletCompositionNote = "The Toilets block holds a Gents washroom at its western end and a Ladies washroom to the east of it.";
+function boundingBox(polygon) {
+  return {
+    minX: Math.min(...polygon.map((point) => point.x)),
+    maxX: Math.max(...polygon.map((point) => point.x)),
+    minY: Math.min(...polygon.map((point) => point.y)),
+    maxY: Math.max(...polygon.map((point) => point.y))
+  };
+}
+
+// Rooms that abut along a wall are described by which side they sit on rather than
+// by centroid angle, which is misleading for long circulation regions.
+function relativeSide(region, other, tolerance = 20) {
+  const box = boundingBox(region.polygon);
+  const otherBox = boundingBox(other.polygon);
+  if (box.maxX - otherBox.minX <= tolerance) return "west";
+  if (otherBox.maxX - box.minX <= tolerance) return "east";
+  if (box.maxY - otherBox.minY <= tolerance) return "north";
+  if (otherBox.maxY - box.minY <= tolerance) return "south";
+  return directionBetweenRegions(other, region);
+}
+
+const compassAdjectives = {
+  north: "northern",
+  south: "southern",
+  east: "eastern",
+  west: "western"
+};
+
+function compassAdjective(direction) {
+  return compassAdjectives[direction] || direction;
+}
+
+// Neighbours come from the index relations, so an adjacency answer can only name
+// a pairing the segmentation actually validated.
+function adjacentRegionIdOf(regionId, mentionedIds = []) {
+  const pairs = catalogs
+    .flatMap((catalog) => catalog.adjacencies || [])
+    .filter((item) => item.regionIds.includes(regionId))
+    .map((item) => item.regionIds.find((id) => id !== regionId));
+  return pairs.find((id) => mentionedIds.includes(id)) || pairs[0] || null;
+}
+
+// Every number below is read from the derived index facts, never authored here.
+function toiletFacilityFacts(regionId) {
+  const region = findRegionById(regionId);
+  if (!region?.facts) return null;
+  const isParent = catalogs.some((catalog) => catalog.regions.some((item) => item.parentId === regionId));
+  return {
+    label: isParent ? `${region.proseName || region.label} block` : region.proseName || region.label,
+    cubicles: region.facts.enclosedCubicleCount,
+    basins: region.facts.basinCount,
+    urinals: region.facts.urinalCount,
+    total: region.facts.totalFixtureCount
+  };
+}
+
+function toiletCompositionNote() {
+  const gents = findRegionById("toilets_gents");
+  const ladies = findRegionById("toilets_ladies");
+  if (!gents || !ladies) return "";
+  return `The Toilets block holds a ${gents.label} to the ${relativeSide(gents, ladies)} and a ${ladies.label} to the ${relativeSide(ladies, gents)}.`;
+}
 
 export function floorplanAnnotationFallbackForMessage(message) {
   const normalized = String(message || "").toLowerCase();
@@ -427,20 +336,22 @@ export function floorplanAnnotationFallbackForMessage(message) {
       }
     };
   }
-  if (mentionsToilets && /\b(?:next to|adjacent|adjoin(?:s|ing)?|beside)\b/.test(normalized)
-    && /\bpassage\b/.test(normalized) && toiletRegionId !== "toilets_gents") {
-    return {
-      selections: [
-        select(toiletRegionId, "primary", "This is the washroom area referenced by the question."),
-        select("passage", "secondary", "This is the adjacent labelled passage.")
-      ],
-      relationship: {
-        type: "adjacency",
-        fromRegionId: toiletRegionId,
-        toRegionId: "passage",
-        direction: null
-      }
-    };
+  if (mentionsToilets && /\b(?:next to|adjacent|adjoin(?:s|ing)?|beside)\b/.test(normalized)) {
+    const neighbourId = adjacentRegionIdOf(toiletRegionId, regionIds);
+    if (neighbourId) {
+      return {
+        selections: [
+          select(toiletRegionId, "primary", "This is the washroom area referenced by the question."),
+          select(neighbourId, "secondary", "This is the validated adjoining area.")
+        ],
+        relationship: {
+          type: "adjacency",
+          fromRegionId: toiletRegionId,
+          toRegionId: neighbourId,
+          direction: null
+        }
+      };
+    }
   }
   if (mentionsToilets && asksForCount) {
     return {
@@ -521,40 +432,78 @@ export function floorplanAnnotationFallbackForMessage(message) {
   return null;
 }
 
+const numberWords = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+
+function numberWord(value) {
+  return numberWords[value] || String(value);
+}
+
+function plural(count, singular, pluralForm = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : pluralForm}`;
+}
+
+function describeFixtures(facts) {
+  const parts = [];
+  if (facts.cubicles) parts.push(plural(facts.cubicles, "enclosed cubicle"));
+  if (facts.urinals) parts.push(plural(facts.urinals, "urinal"));
+  if (facts.basins) parts.push(plural(facts.basins, "wash basin"));
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
+function childRegions(parentId) {
+  return catalogs.flatMap((catalog) => catalog.regions).filter((region) => region.parentId === parentId);
+}
+
 export function groundFloorplanReply(message, reply) {
   const normalized = String(message || "").toLowerCase();
   if (!toiletMentionPattern.test(normalized)) return reply;
   const regionId = resolveToiletRegionId(normalized);
-  const facts = toiletFacilityFacts[regionId];
+  const facts = toiletFacilityFacts(regionId);
+  if (!facts) return reply;
+  const composition = toiletCompositionNote();
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
   if (asksForCount && /\burinals?\b/.test(normalized)) {
-    return facts.urinals > 0
-      ? `The ${facts.label} shows ${facts.urinals} urinals. ${toiletCompositionNote}`
-      : `The ${facts.label} shows no urinals; the plan draws all 4 urinals in the Gents washroom.`;
+    if (facts.urinals > 0) return `The ${facts.label} shows ${plural(facts.urinals, "urinal")}. ${composition}`;
+    const withUrinals = childRegions("toilets")
+      .map((region) => ({ region, facts: toiletFacilityFacts(region.id) }))
+      .filter((item) => item.facts.urinals > 0)
+      .map((item) => `${plural(item.facts.urinals, "urinal")} in the ${item.region.label}`);
+    return `The ${facts.label} shows no urinals; the plan draws ${withUrinals.join(" and ")}.`;
   }
   if (asksForCount && /\b(sinks?|basins?)\b/.test(normalized)) {
-    return `The ${facts.label} shows ${facts.basins} wash basins. ${toiletCompositionNote}`;
+    return `The ${facts.label} shows ${plural(facts.basins, "wash basin")}. ${composition}`;
   }
   if (asksForCount && /\bfixtures?\b/.test(normalized)) {
-    const total = facts.cubicles + facts.basins + facts.urinals;
-    return `The ${facts.label} shows ${total} plumbing fixtures: ${facts.cubicles} enclosed cubicles, ${facts.basins} wash basins and ${facts.urinals} urinals.`;
+    return `The ${facts.label} shows ${plural(facts.total, "plumbing fixture")}: ${describeFixtures(facts)}.`;
   }
   if (asksForCount && regionId === "toilets" && /\b(washrooms?|bathrooms?|restrooms?)\b/.test(normalized)) {
-    return `Level 12 has one labelled Toilets block containing two washrooms: the Gents washroom with 2 enclosed cubicles, 4 urinals and 2 basins, and the Ladies washroom with 3 enclosed cubicles and 4 basins.`;
+    const children = childRegions("toilets");
+    const detail = children
+      .map((region) => `the ${region.label} with ${describeFixtures(toiletFacilityFacts(region.id))}`)
+      .join(", and ");
+    return `Level 12 has one labelled Toilets block containing ${numberWord(children.length)} washrooms: ${detail}.`;
   }
   if (asksForCount) {
-    const urinalNote = facts.urinals > 0 ? `, plus ${facts.urinals} urinals` : "";
-    return `The ${facts.label} shows ${facts.cubicles} enclosed toilet cubicles${urinalNote}. ${toiletCompositionNote}`;
+    const urinalNote = facts.urinals > 0 ? `, plus ${plural(facts.urinals, "urinal")}` : "";
+    return `The ${facts.label} shows ${plural(facts.cubicles, "enclosed toilet cubicle")}${urinalNote}. ${composition}`;
+  }
+  if (/\b(?:is|are) there\b|\bseparate\b|\bgender(?:ed|-specific)?\b|\bdoes .*\bhave\b/.test(normalized)) {
+    const children = childRegions("toilets");
+    const detail = children
+      .map((region) => `the ${region.label} (${describeFixtures(toiletFacilityFacts(region.id))})`)
+      .join(" and ");
+    return `Yes — the Level 12 plan labels ${numberWord(children.length)} separate washrooms inside the Toilets block: ${detail}.`;
   }
   if (/\b(where|locate|find|next to|adjacent|adjoin(?:s|ing)?|beside|nearest|closest)\b/.test(normalized)
     || wayfindingPattern.test(normalized)) {
-    if (regionId === "toilets_ladies") {
-      return `The Ladies washroom is the eastern half of the Toilets block on the west side of Level 12, immediately west of the labelled Passage.`;
+    const passage = findRegionById("passage");
+    const region = findRegionById(regionId);
+    if (regionId === "toilets") {
+      return `The ${facts.label} sits immediately ${relativeSide(region, passage)} of the labelled ${passage.label}. ${composition}`;
     }
-    if (regionId === "toilets_gents") {
-      return `The Gents washroom is at the far western end of the Toilets block, beyond the Ladies washroom and west of the labelled Passage.`;
-    }
-    return `The Toilets block sits immediately west of the labelled Passage. ${toiletCompositionNote}`;
+    const sibling = childRegions("toilets").find((item) => item.id !== regionId);
+    return `The ${region.label} is the ${compassAdjective(relativeSide(region, sibling))} room of the Toilets block, ${relativeSide(region, passage)} of the labelled ${passage.label} and ${relativeSide(region, sibling)} of the ${sibling.label}.`;
   }
   return reply;
 }

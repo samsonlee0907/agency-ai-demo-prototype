@@ -122,13 +122,15 @@ test("tenant assistant grounds toilet variants and safe wayfinding overlays", ()
     ["How many toilets are in the women's bathroom?", /Ladies washroom shows 3 enclosed toilet cubicles/, ["toilets_ladies"]],
     ["How many toilets are in the gents?", /Gents washroom shows 2 enclosed toilet cubicles/, ["toilets_gents"]],
     ["How many washrooms are shown on Level 12?", /two washrooms/, ["toilets"]],
-    ["Where is the ladies washroom?", /Ladies washroom is the eastern half/, ["toilets_ladies", "passage"]],
-    ["Is the ladies washroom next to the passage?", /Ladies washroom is the eastern half/, ["toilets_ladies", "passage"]],
+    ["Where is the ladies washroom?", /Ladies washroom is the eastern room of the Toilets block/, ["toilets_ladies", "passage"]],
+    ["Is the ladies washroom next to the passage?", /Ladies washroom is the eastern room of the Toilets block/, ["toilets_ladies", "passage"]],
     ["How many sinks are in the ladies washroom?", /Ladies washroom shows 4 wash basins/, ["toilets_ladies"]],
     ["How many urinals are shown?", /Toilets block shows 4 urinals/, ["toilets"]],
-    ["Where is the men's washroom?", /Gents washroom is at the far western end/, ["toilets_gents", "toilets_ladies"]],
-    ["Where is the gents?", /Gents washroom is at the far western end/, ["toilets_gents", "toilets_ladies"]],
-    ["How many fixtures are in the toilets?", /15 plumbing fixtures/, ["toilets"]]
+    ["Where is the men's washroom?", /Gents washroom is the western room of the Toilets block/, ["toilets_gents", "toilets_ladies"]],
+    ["Where is the gents?", /Gents washroom is the western room of the Toilets block/, ["toilets_gents", "toilets_ladies"]],
+    ["How many fixtures are in the toilets?", /15 plumbing fixtures/, ["toilets"]],
+    ["What is next to the toilets?", /sits immediately west of the labelled Passage/, ["toilets", "passage"]],
+    ["Is there a separate ladies washroom?", /two separate washrooms inside the Toilets block/, ["toilets_ladies", "passage"]]
   ];
   for (const [message, replyPattern, regionIds] of toiletScenarios) {
     const result = answerTenant("building-meridian", message);

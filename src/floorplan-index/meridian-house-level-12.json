@@ -1,0 +1,181 @@
+{
+  "id": "meridian-house-level-12",
+  "assetId": "floorplan-meridian-level-12",
+  "source": { "width": 2256, "height": 1304 },
+  "scale": 1000,
+  "provenance": {
+    "method": "model-proposed, human-reviewed",
+    "sourceImage": "public/assets/floorplans/meridian-house-level-12-floorplan.jpeg",
+    "notes": "Region polygons and fixture points were read from the source raster and checked by rendering them back over the image. Counts are never authored here: they are derived by testing which fixture points fall inside which region polygon."
+  },
+  "regions": [
+    {
+      "id": "reception",
+      "label": "Reception",
+      "type": "room",
+      "description": "The labelled reception room directly below the restaurant.",
+      "polygon": [{ "x": 738, "y": 648 }, { "x": 850, "y": 648 }, { "x": 850, "y": 745 }, { "x": 738, "y": 745 }],
+      "labelAnchor": { "x": 794, "y": 697 }
+    },
+    {
+      "id": "restaurant",
+      "label": "Restaurant",
+      "type": "room",
+      "areaSqm": 207.2,
+      "description": "The complete labelled restaurant footprint, excluding the balcony, bar, reception, kitchen and changing rooms.",
+      "polygon": [
+        { "x": 689, "y": 238 }, { "x": 950, "y": 238 }, { "x": 950, "y": 374 }, { "x": 903, "y": 374 },
+        { "x": 903, "y": 618 }, { "x": 738, "y": 618 }, { "x": 738, "y": 547 }, { "x": 689, "y": 547 }
+      ],
+      "labelAnchor": { "x": 820, "y": 500 }
+    },
+    {
+      "id": "office_west_64_2",
+      "label": "West office 64.2 m²",
+      "type": "room",
+      "areaSqm": 64.2,
+      "description": "The western or left office labelled 64.2 m².",
+      "polygon": [{ "x": 283, "y": 239 }, { "x": 492, "y": 239 }, { "x": 492, "y": 544 }, { "x": 283, "y": 544 }],
+      "labelAnchor": { "x": 387, "y": 392 }
+    },
+    {
+      "id": "office_east_64_2",
+      "label": "East office 64.2 m²",
+      "type": "room",
+      "areaSqm": 64.2,
+      "description": "The eastern or right office labelled 64.2 m², immediately beside the restaurant.",
+      "polygon": [{ "x": 493, "y": 239 }, { "x": 699, "y": 239 }, { "x": 699, "y": 544 }, { "x": 493, "y": 544 }],
+      "labelAnchor": { "x": 596, "y": 392 }
+    },
+    {
+      "id": "office_114_4",
+      "label": "Largest office 114.4 m²",
+      "type": "room",
+      "areaSqm": 114.4,
+      "description": "The largest labelled office in the lower-left of the plan.",
+      "polygon": [
+        { "x": 34, "y": 382 }, { "x": 222, "y": 382 }, { "x": 222, "y": 663 }, { "x": 248, "y": 663 },
+        { "x": 248, "y": 966 }, { "x": 81, "y": 966 }, { "x": 81, "y": 928 }, { "x": 34, "y": 928 }
+      ],
+      "labelAnchor": { "x": 141, "y": 700 }
+    },
+    {
+      "id": "verandah",
+      "label": "Verandah",
+      "type": "transition",
+      "description": "The labelled horizontal transition strip along the office fronts toward the restaurant.",
+      "polygon": [{ "x": 281, "y": 544 }, { "x": 738, "y": 544 }, { "x": 738, "y": 666 }, { "x": 281, "y": 666 }],
+      "labelAnchor": { "x": 510, "y": 605 },
+      "axis": [{ "x": 320, "y": 605 }, { "x": 700, "y": 605 }],
+      "directionRegionIds": ["office_114_4", "restaurant"]
+    },
+    {
+      "id": "central_stairs",
+      "label": "Central stairs",
+      "type": "circulation",
+      "description": "The central stair core between the two storage rooms.",
+      "polygon": [{ "x": 477, "y": 620 }, { "x": 521, "y": 620 }, { "x": 521, "y": 782 }, { "x": 477, "y": 782 }],
+      "labelAnchor": { "x": 499, "y": 701 }
+    },
+    {
+      "id": "storage_west",
+      "label": "West stair storage",
+      "type": "service",
+      "description": "The storage room immediately left of the central stairs.",
+      "polygon": [{ "x": 433, "y": 621 }, { "x": 467, "y": 621 }, { "x": 467, "y": 780 }, { "x": 433, "y": 780 }],
+      "labelAnchor": { "x": 450, "y": 701 }
+    },
+    {
+      "id": "storage_east",
+      "label": "East stair storage",
+      "type": "service",
+      "description": "The storage room immediately right of the central stairs.",
+      "polygon": [{ "x": 520, "y": 621 }, { "x": 553, "y": 621 }, { "x": 553, "y": 780 }, { "x": 520, "y": 780 }],
+      "labelAnchor": { "x": 537, "y": 701 }
+    },
+    {
+      "id": "toilets",
+      "label": "Toilets",
+      "type": "service",
+      "genderDesignation": "separate gents and ladies washrooms",
+      "description": "The complete western block labelled Toilets beside the passage. It contains the labelled Gents washroom and the labelled Ladies washroom.",
+      "polygon": [{ "x": 35, "y": 137 }, { "x": 227, "y": 137 }, { "x": 227, "y": 384 }, { "x": 35, "y": 384 }],
+      "labelAnchor": { "x": 131, "y": 261 }
+    },
+    {
+      "id": "toilets_gents",
+      "label": "Gents washroom",
+      "type": "service",
+      "parentId": "toilets",
+      "genderDesignation": "gents",
+      "description": "The labelled Gents washroom inside the Toilets block.",
+      "polygon": [{ "x": 39, "y": 147 }, { "x": 114, "y": 147 }, { "x": 114, "y": 376 }, { "x": 39, "y": 376 }],
+      "labelAnchor": { "x": 76, "y": 261 }
+    },
+    {
+      "id": "toilets_ladies",
+      "label": "Ladies washroom",
+      "type": "service",
+      "parentId": "toilets",
+      "genderDesignation": "ladies",
+      "description": "The labelled Ladies washroom inside the Toilets block.",
+      "polygon": [{ "x": 119, "y": 147 }, { "x": 218, "y": 147 }, { "x": 218, "y": 307 }, { "x": 119, "y": 307 }],
+      "labelAnchor": { "x": 168, "y": 227 }
+    },
+    {
+      "id": "passage",
+      "label": "Passage",
+      "type": "circulation",
+      "description": "The labelled north-south passage between the toilets and office areas.",
+      "polygon": [{ "x": 220, "y": 232 }, { "x": 282, "y": 232 }, { "x": 282, "y": 670 }, { "x": 220, "y": 670 }],
+      "labelAnchor": { "x": 251, "y": 451 }
+    },
+    {
+      "id": "kitchen",
+      "label": "Kitchen",
+      "type": "service",
+      "description": "The labelled kitchen below and slightly right of reception.",
+      "polygon": [{ "x": 741, "y": 779 }, { "x": 846, "y": 779 }, { "x": 846, "y": 957 }, { "x": 741, "y": 957 }],
+      "labelAnchor": { "x": 794, "y": 868 }
+    }
+  ],
+  "fixtures": [
+    { "id": "urinal_gents_1", "kind": "urinal", "at": { "x": 51, "y": 156 } },
+    { "id": "urinal_gents_2", "kind": "urinal", "at": { "x": 66, "y": 156 } },
+    { "id": "urinal_gents_3", "kind": "urinal", "at": { "x": 82, "y": 156 } },
+    { "id": "urinal_gents_4", "kind": "urinal", "at": { "x": 97, "y": 156 } },
+    { "id": "basin_gents_1", "kind": "basin", "at": { "x": 51, "y": 242 } },
+    { "id": "basin_gents_2", "kind": "basin", "at": { "x": 70, "y": 242 } },
+    { "id": "wc_gents_1", "kind": "wc", "at": { "x": 47, "y": 285 } },
+    { "id": "wc_gents_2", "kind": "wc", "at": { "x": 48, "y": 347 } },
+    { "id": "wc_ladies_1", "kind": "wc", "at": { "x": 135, "y": 163 } },
+    { "id": "wc_ladies_2", "kind": "wc", "at": { "x": 169, "y": 163 } },
+    { "id": "wc_ladies_3", "kind": "wc", "at": { "x": 205, "y": 163 } },
+    { "id": "basin_ladies_1", "kind": "basin", "at": { "x": 131, "y": 296 } },
+    { "id": "basin_ladies_2", "kind": "basin", "at": { "x": 151, "y": 296 } },
+    { "id": "basin_ladies_3", "kind": "basin", "at": { "x": 171, "y": 296 } },
+    { "id": "basin_ladies_4", "kind": "basin", "at": { "x": 190, "y": 296 } }
+  ],
+  "relations": [
+    {
+      "type": "adjacent",
+      "regionIds": ["office_east_64_2", "restaurant"],
+      "boundary": [{ "x": 699, "y": 270 }, { "x": 699, "y": 520 }]
+    },
+    {
+      "type": "adjacent",
+      "regionIds": ["toilets", "passage"],
+      "boundary": [{ "x": 224, "y": 232 }, { "x": 224, "y": 384 }]
+    },
+    {
+      "type": "adjacent",
+      "regionIds": ["toilets_ladies", "passage"],
+      "boundary": [{ "x": 219, "y": 232 }, { "x": 219, "y": 307 }]
+    },
+    {
+      "type": "adjacent",
+      "regionIds": ["toilets_gents", "toilets_ladies"],
+      "boundary": [{ "x": 116, "y": 147 }, { "x": 116, "y": 307 }]
+    }
+  ]
+}

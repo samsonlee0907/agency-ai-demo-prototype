@@ -13,6 +13,8 @@ This scenario answers tenant questions from a selected building's fictional know
 | Contracts | `assistantRequestSchema`, `assistantOutputSchema`, and `assistantJsonSchema` in `src/schemas.js` |
 | Building knowledge | `buildingProfiles` in `src/data.js` |
 | Approved floorplan registry and loader | `src/floorplan-assets.js` |
+| Verified segmentation index (regions, fixtures, relations) | `src/floorplan-index/meridian-house-level-12.json` |
+| Index loader, validation and fact derivation | `src/floorplan-index.js` |
 | Validated semantic regions and renderer hints | `src/floorplan-regions.js` |
 | Repetition filtering | `src/assistant-conversation.js` |
 | Mock triage | `answerTenant()` in `src/mock-services.js` |
@@ -187,6 +189,17 @@ For a relevant Meridian House question, the server resolves the asset from its f
 The browser never supplies an image URL, asset ID, file path, or image bytes. GPT-5.6 Terra receives the image only when the current message mentions a floorplan, layout, navigation, or a feature represented on the plan. Image input uses `detail: "original"` because floorplans contain dense labels and spatial relationships.
 
 The model-facing region catalog contains semantic descriptions but no polygons, boundaries, label anchors, dimensions, or SVG. Terra can select regions but cannot author rendering geometry.
+
+## Segment first, then answer from the index
+
+Spatial facts are not typed into code. `src/floorplan-index/meridian-house-level-12.json` is a committed segmentation of the plan: each room is a polygon, each plumbing fixture is an individual point with a kind (`wc`, `urinal`, `basin`), and rooms nest through `parentId`. `src/floorplan-index.js` loads that artifact, validates it, and *derives* every count by testing which fixture points fall inside which room polygon. Startup fails if a child room escapes its parent or a fixture lands in zero or several rooms, so a bad segmentation can never reach a tenant.
+
+Everything downstream reads those derived values:
+
+- grounded replies quote derived cubicle, urinal and basin counts rather than hard-coded numbers;
+- room-to-room wording ("the eastern room of the Toilets block") comes from comparing bounding boxes, not from prose;
+- the model-facing catalog carries each region's derived `facts`, a coarse `position`, and the validated `relations` list, and tells Terra to treat them as authoritative instead of re-counting fixtures from the picture;
+- annotation geometry stays server-owned, so the answer text and the overlay are computed from the same verified source.
 
 Terra is instructed to:
 
