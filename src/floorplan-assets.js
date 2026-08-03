@@ -36,6 +36,12 @@ export function findFloorplanForMessage(building, message) {
   return building.floorplans.map((floorplan) => findFloorplanAsset(floorplan.id)).find(Boolean) || null;
 }
 
+export function floorplanAnnotationRequested(message) {
+  const normalized = String(message || "").toLowerCase();
+  return /\b(annotat(?:e|ed|ion)|highlight|mark|point|locate|find|identify|where|which|nearest|closest|relative|relationship|adjacent|adjoin(?:s|ing)?|beside|between|near|direction|towards?|north|south|east|west|how many|number of|count|largest|biggest|smallest|size|area|compare|comparison)\b/.test(normalized)
+    || /\bnext to\b/.test(normalized);
+}
+
 export function emptyFloorplanAttachment() {
   return {
     included: false,

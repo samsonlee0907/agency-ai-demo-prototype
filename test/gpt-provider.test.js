@@ -206,7 +206,7 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
 
   const grounded = await provider.respondToTenant(
     building,
-    "Show me the Level 12 floor plan",
+    "Where is the restaurant relative to the central stairs?",
     [],
     { asset: floorplan, dataUrl }
   );
@@ -218,10 +218,24 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   assert.equal(grounded.floorplan.annotation.marker.kind, "direction-arrow");
   const modelInput = JSON.parse(requests[0].input[1].content[0].text);
   assert.equal(modelInput.floorplanCatalog.id, "meridian-house-level-12");
+  assert.equal(modelInput.annotationRequested, true);
   assert.doesNotMatch(JSON.stringify(modelInput.floorplanCatalog), /polygon|coordinates|axis|boundary/i);
 
+  const plain = await provider.respondToTenant(
+    building,
+    "Show me the Level 12 floor plan",
+    [],
+    { asset: floorplan, dataUrl }
+  );
+  assert.equal(plain.floorplan.included, true);
+  assert.equal(plain.floorplan.annotation, null);
+  assert.equal(plain.floorplan.caption, floorplan.description);
+  const plainModelInput = JSON.parse(requests[1].input[1].content[0].text);
+  assert.equal(plainModelInput.annotationRequested, false);
+  assert.equal(plainModelInput.floorplanCatalog, null);
+
   const textOnly = await provider.respondToTenant(building, "What are the concierge hours?", []);
-  assert.equal(requests[1].input[1].content.some((item) => item.type === "input_image"), false);
+  assert.equal(requests[2].input[1].content.some((item) => item.type === "input_image"), false);
   assert.equal(textOnly.floorplan.included, false);
 });
 

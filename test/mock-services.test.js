@@ -115,10 +115,12 @@ test("tenant assistant Mock mode annotates count and size evidence deterministic
   assert.equal(size.floorplan.annotation.regions[0].areaSqm, 114.4);
 });
 
-test("tenant assistant uses the plain plan when no validated region confidently matches", () => {
+test("tenant assistant uses the plain plan for generic display requests", () => {
   const broad = answerTenant("building-meridian", "Show me the Level 12 floor plan and main amenities");
+  const namedFeatures = answerTenant("building-meridian", "Show me the floor plan with the restaurant and stairs");
   assert.equal(broad.floorplan.included, true);
   assert.equal(broad.floorplan.annotation, null);
+  assert.equal(namedFeatures.floorplan.annotation, null);
   assert.match(broad.reply, /without a highlight/i);
 });
 

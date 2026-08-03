@@ -1,7 +1,11 @@
 import OpenAI from "openai";
 import { DefaultAzureCredential, getBearerTokenProvider } from "@azure/identity";
 import { filterSuggestedReplies } from "../assistant-conversation.js";
-import { buildFloorplanAttachment, emptyFloorplanAttachment } from "../floorplan-assets.js";
+import {
+  buildFloorplanAttachment,
+  emptyFloorplanAttachment,
+  floorplanAnnotationRequested
+} from "../floorplan-assets.js";
 import { floorplanCatalogForModel, groundFloorplanAnnotation } from "../floorplan-regions.js";
 import {
   ASSISTANT_REPLY_MAX_LENGTH,
@@ -68,7 +72,7 @@ export function normalizeAssistantFollowUps(result, history = []) {
   };
 }
 
-export function groundTenantFloorplan(result, floorplan) {
+export function groundTenantFloorplan(result, floorplan, allowAnnotation = true) {
   const modelAttachment = result.floorplan;
   if (!floorplan) {
     if (modelAttachment.included || modelAttachment.assetId || modelAttachment.annotation !== null) {
@@ -82,15 +86,21 @@ export function groundTenantFloorplan(result, floorplan) {
   if (!modelAttachment.included && modelAttachment.annotation !== null) {
     throw new ModelResponseError("GPT returned annotations for an excluded floorplan.");
   }
-  let annotation;
+  let annotation = null;
   try {
-    annotation = groundFloorplanAnnotation(floorplan.asset.id, modelAttachment.annotation);
+    if (allowAnnotation) {
+      annotation = groundFloorplanAnnotation(floorplan.asset.id, modelAttachment.annotation);
+    }
   } catch (error) {
     throw new ModelResponseError(`GPT returned an invalid floorplan annotation: ${error.message}`, error);
   }
   return {
     ...result,
-    floorplan: buildFloorplanAttachment(floorplan.asset, modelAttachment.caption, annotation)
+    floorplan: buildFloorplanAttachment(
+      floorplan.asset,
+      allowAnnotation ? modelAttachment.caption : "",
+      annotation
+    )
   };
 }
 
@@ -316,24 +326,25 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
       });
     },
     async respondToTenant(building, message, history, floorplan = null) {
+      const annotationRequested = floorplan ? floorplanAnnotationRequested(message) : false;
       const buildingContext = {
         ...building,
         floorplans: floorplan ? [floorplan.asset] : []
       };
-      const floorplanCatalog = floorplan
+      const floorplanCatalog = floorplan && annotationRequested
         ? floorplanCatalogForModel(floorplan.asset.id)
         : null;
       const result = await generateStructured({
         name: "tenant_assistant_response",
-        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge, conversation and approved floorplan image when present. Triage maintenance safely and never invent access, lease or account facts. Reason over the full conversation: acknowledge confirmed facts once, advance the task, and never repeat or lightly rephrase a prior reply, question, user message or previously offered quick reply. Do not prefix reply with 'Aurelia:'. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. A static floorplan is for general spatial orientation only: never treat it as proof of accessibility, current occupancy, obstructions, door connectivity or an emergency route, and direct emergency-egress questions to posted signage and wardens. Never infer or describe a traversable walking route. When an approved floorplan catalog is supplied, visual intent may contain only exact catalog region IDs, primary/secondary/context roles, a relationship type, optional endpoint IDs and direction, and short reasons. Never return coordinates, boxes, polygons, paths, SVG, colors, labels or dimensions. Use annotation null when no catalog region confidently supports the answer. Use adjacency only for regions whose supplied descriptions clearly say they directly adjoin. For direction through a transition region, select that transition region but describe only the general spatial direction, not a route. Ask any qualification or follow-up question directly in reply as Aurelia. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. The floorplan object is required: use only the supplied asset ID when an image is supplied and relevant; otherwise set included false, strings empty and annotation null. suggestions are optional ready-to-send tenant answers or decisions that materially advance the conversation. Return an empty suggestions array when the next response requires open-ended tenant details such as a floor, area, time or description. Never offer placeholders such as 'I can confirm...' or 'I will provide...', repeat an earlier choice, put a question or Aurelia prompt in suggestions, instruct support staff, or invent a tenant fact.",
-        input: { building: buildingContext, floorplanCatalog, message, history },
+        instructions: "You are a concise tenant virtual assistant for a managed property. Answer only from the supplied building knowledge, conversation and approved floorplan image when present. Triage maintenance safely and never invent access, lease or account facts. Reason over the full conversation: acknowledge confirmed facts once, advance the task, and never repeat or lightly rephrase a prior reply, question, user message or previously offered quick reply. Do not prefix reply with 'Aurelia:'. If urgency is Emergency, the reply must first tell the occupant to call 000 when there is immediate danger, then give safe keep-clear guidance before any building-security handoff. A static floorplan is for general spatial orientation only: never treat it as proof of accessibility, current occupancy, obstructions, door connectivity or an emergency route, and direct emergency-egress questions to posted signage and wardens. Never infer or describe a traversable walking route. If annotationRequested is false, show the original floorplan with annotation null and do not refer to highlights or overlays. When annotationRequested is true and an approved floorplan catalog is supplied, visual intent may contain only exact catalog region IDs, primary/secondary/context roles, a relationship type, optional endpoint IDs and direction, and short reasons. Never return coordinates, boxes, polygons, paths, SVG, colors, labels or dimensions. Use annotation null when no catalog region confidently supports the answer. Use adjacency only for regions whose supplied descriptions clearly say they directly adjoin. For direction through a transition region, select that transition region but describe only the general spatial direction, not a route. Ask any qualification or follow-up question directly in reply as Aurelia. Create a work order only when the user reports an actionable facilities fault. Citations must name supplied knowledge articles or building contact details. The floorplan object is required: use only the supplied asset ID when an image is supplied and relevant; otherwise set included false, strings empty and annotation null. suggestions are optional ready-to-send tenant answers or decisions that materially advance the conversation. Return an empty suggestions array when the next response requires open-ended tenant details such as a floor, area, time or description. Never offer placeholders such as 'I can confirm...' or 'I will provide...', repeat an earlier choice, put a question or Aurelia prompt in suggestions, instruct support staff, or invent a tenant fact.",
+        input: { building: buildingContext, floorplanCatalog, annotationRequested, message, history },
         jsonSchema: assistantJsonSchema,
         outputSchema: assistantModelOutputSchema,
         userContent: floorplan
           ? [{ type: "input_image", image_url: floorplan.dataUrl, detail: "original" }]
           : []
       });
-      const grounded = groundTenantFloorplan(result, floorplan);
+      const grounded = groundTenantFloorplan(result, floorplan, annotationRequested);
       const normalized = ensureEmergencyGuidance(normalizeAssistantFollowUps(
         grounded,
         [...history, { role: "user", content: message }]
