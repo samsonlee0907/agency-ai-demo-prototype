@@ -27,15 +27,28 @@ export function findFloorplanAsset(id) {
   return recordsById.get(id)?.asset;
 }
 
-export function findFloorplanForMessage(building, message) {
-  if (!building?.floorplans?.length) return null;
-  const normalized = String(message || "").toLowerCase();
+function referencesFloorplan(normalized) {
   const asksForPlan = /\b(floor\s*plan|floorplan|layout|map|wayfinding|navigate|navigation)\b/.test(normalized);
   const asksAboutPlanFeature = /\b(offices?|rooms?|meeting room|reception|restaurant|dining|bar|kitchen|storage|toilets?|washrooms?|bathrooms?|restrooms?|wc|loos?|lavator(?:y|ies)|gents?|gent'?s|ladies|lady'?s|cubicles?|sinks?|basins?|urinals?|fixtures?|amenit(?:y|ies)|balcony|verandah|passage|stairs?|lifts?|elevators?|exits?)\b/.test(normalized);
-  if (!asksForPlan && !asksAboutPlanFeature) return null;
+  return asksForPlan || asksAboutPlanFeature;
+}
+
+export function findFloorplanForMessage(building, message, history = []) {
+  if (!building?.floorplans?.length) return null;
+  const normalized = String(message || "").toLowerCase();
+  // Keep the image available for the next conversational turn after a
+  // floorplan exchange. Terra can then interpret unrestricted follow-up
+  // language instead of the server maintaining a synonym list.
+  const recentFloorplanContext = history
+    .slice(-2)
+    .some((turn) => referencesFloorplan(String(turn?.content || "").toLowerCase()));
+  if (!referencesFloorplan(normalized) && !recentFloorplanContext) return null;
   return building.floorplans.map((floorplan) => findFloorplanAsset(floorplan.id)).find(Boolean) || null;
 }
 
+// Mock mode remains deterministic and uses this narrower classifier to decide
+// whether its canned answer should include an overlay. Live mode lets Terra
+// decide visual intent whenever an approved floorplan is supplied.
 export function floorplanAnnotationRequested(message) {
   const normalized = String(message || "").toLowerCase();
   return /\b(annotat(?:e|ed|ion)|highlight|mark|point|locate|find|identify|where|which|nearest|closest|relative|relationship|adjacent|adjoin(?:s|ing)?|beside|between|near|direction|towards?|north|south|east|west|how many|number of|count|largest|biggest|smallest|size|area|compare|comparison)\b/.test(normalized)

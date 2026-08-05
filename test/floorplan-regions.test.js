@@ -8,11 +8,11 @@ import {
   groundFloorplanAnnotation,
   groundFloorplanReply,
   verifyFloorplanReply,
-  floorplanRouteForModel,
   resolveFloorplanAnaphora,
   validateFloorplanRegionCatalog
 } from "../src/floorplan-regions.js";
-import { floorplanAnnotationRequested } from "../src/floorplan-assets.js";
+import { findFloorplanForMessage } from "../src/floorplan-assets.js";
+import { findBuilding } from "../src/data.js";
 import {
   assistantJsonSchema,
   floorplanAnnotationIntentSchema
@@ -89,7 +89,8 @@ test("model catalog exposes semantics without any renderer geometry", () => {
   }
 });
 
-test("floorplan intent recognizes washroom and wayfinding wording without annotating generic display", () => {
+test("floorplan asset selection recognizes relevant natural-language questions", () => {
+  const building = findBuilding("building-meridian");
   for (const message of [
     "How many cubicles are in the ladies washroom?",
     "Where is the men's washroom?",
@@ -100,10 +101,40 @@ test("floorplan intent recognizes washroom and wayfinding wording without annota
     "Show a route from the stairs to the restaurant.",
     "Navigate me from the toilets to reception."
   ]) {
-    assert.equal(floorplanAnnotationRequested(message), true, message);
+    assert.equal(findFloorplanForMessage(building, message)?.id, assetId, message);
   }
-  assert.equal(floorplanAnnotationRequested("Show me the Level 12 floor plan"), false);
-  assert.equal(floorplanAnnotationRequested("Can I see the floorplan?"), false);
+  assert.equal(findFloorplanForMessage(building, "Show me the Level 12 floor plan")?.id, assetId);
+  assert.equal(findFloorplanForMessage(building, "Can I see the floorplan?")?.id, assetId);
+  assert.equal(findFloorplanForMessage(building, "What are the concierge hours?"), null);
+});
+
+test("a contextual reverse-route follow-up keeps the approved floorplan in model context", () => {
+  const building = findBuilding("building-meridian");
+  const history = [
+    { role: "user", content: "How do I get from the gents washroom to the restaurant?" },
+    { role: "assistant", content: "The route passes through the Toilets block, Passage and Verandah." }
+  ];
+  for (const message of [
+    "reverse that route",
+    "the other way round",
+    "what about the opposite direction?",
+    "can I go back the same way?",
+    "could you retrace it?",
+    "and in reverse?"
+  ]) {
+    assert.equal(
+      findFloorplanForMessage(building, message, history)?.id,
+      assetId,
+      message
+    );
+  }
+  // The next turn retains image context regardless of phrasing; Terra may
+  // decline to include the plan when the new question is unrelated.
+  assert.equal(
+    findFloorplanForMessage(building, "What are the concierge hours?", history)?.id,
+    assetId
+  );
+  assert.equal(findFloorplanForMessage(building, "What are the concierge hours?", []), null);
 });
 
 test("toilet and wayfinding questions have authoritative fallback intents", () => {
@@ -400,28 +431,36 @@ test("route annotations are drawn from server-owned doorways only", () => {
   assert.match(annotation.relationship.label, /^Walking route from Gents washroom to Restaurant via /);
   assert.match(annotation.safetyNote, /not verified for step-free access/);
 
-  // The model may name endpoints, but it can never smuggle in its own path.
+  // The model only needs to identify endpoints. The graph supplies every
+  // intermediate region and ignores any unrelated model selection.
   const dropped = {
     ...intent,
     selections: intent.selections.filter((item) => item.role !== "context")
   };
-  assert.throws(() => groundFloorplanAnnotation(assetId, dropped), /route passes through/);
-  assert.throws(
-    () => groundFloorplanAnnotation(assetId, {
-      selections: [selection("toilets_gents"), selection("verandah", "secondary")],
-      relationship: { type: "route", fromRegionId: "toilets_gents", toRegionId: "verandah", direction: null }
-    }),
-    /route passes through/
+  assert.deepEqual(
+    groundFloorplanAnnotation(assetId, dropped).regions.map((region) => region.id),
+    intent.selections.map((item) => item.regionId)
   );
-});
 
-test("the model receives the resolved route without any geometry", () => {
-  const route = floorplanRouteForModel(assetId, "kitchen", "toilets_ladies");
-  assert.equal(route.fromRegionId, "kitchen");
-  assert.deepEqual(route.steps.map((step) => step.toRegionId), ["reception", "restaurant", "verandah", "passage", "toilets_ladies"]);
-  assert.ok(route.steps.every((step) => step.heading && step.via));
-  assert.doesNotMatch(JSON.stringify(route), /polygon|labelAnchor|"x"|"y"/i);
-  assert.equal(floorplanRouteForModel(assetId, "kitchen", "kitchen"), null);
+  const reversed = groundFloorplanAnnotation(assetId, {
+    selections: [
+      selection("toilets_gents"),
+      selection("restaurant", "secondary"),
+      selection("kitchen", "context")
+    ],
+    relationship: {
+      type: "route",
+      fromRegionId: "restaurant",
+      toRegionId: "toilets_gents",
+      direction: null
+    }
+  });
+  assert.deepEqual(
+    reversed.regions.map((region) => region.id),
+    ["toilets_gents", "restaurant", "verandah", "passage", "toilets"]
+  );
+  assert.equal(reversed.marker.kind, "route-path");
+  assert.match(reversed.relationship.label, /^Walking route from Restaurant to Gents washroom via /);
 });
 
 test("model replies are kept when they agree with the index and replaced when they do not", () => {
@@ -441,6 +480,41 @@ test("model replies are kept when they agree with the index and replaced when th
     /^From the Gents washroom, head southeast/
   );
   assert.match(verifyFloorplanReply(wayfinding, "   "), /^From the Gents washroom, head southeast/);
+
+  const reverseAnnotation = groundFloorplanAnnotation(assetId, {
+    selections: [selection("toilets_gents"), selection("restaurant", "secondary")],
+    relationship: {
+      type: "route",
+      fromRegionId: "restaurant",
+      toRegionId: "toilets_gents",
+      direction: null
+    }
+  });
+  assert.match(
+    verifyFloorplanReply(
+      "the other way round, from restaurant to gents washroom?",
+      "No connected route is drawn for this direction.",
+      reverseAnnotation
+    ),
+    /^From the Restaurant, head southwest/
+  );
+  assert.match(
+    verifyFloorplanReply(
+      "the other way round, from restaurant to gents washroom?",
+      "To reach the Gents washroom, start at the Restaurant, go into the Passage, then the Verandah and Toilets.",
+      reverseAnnotation
+    ),
+    /^From the Restaurant, head southwest/
+  );
+  const destinationFirstButOrdered = "To reach the Gents washroom from the Restaurant, cross the Verandah, continue through the Passage and enter the Toilets block.";
+  assert.equal(
+    verifyFloorplanReply(
+      "the other way round, from restaurant to gents washroom?",
+      destinationFirstButOrdered,
+      reverseAnnotation
+    ),
+    destinationFirstButOrdered
+  );
 
   // Questions the index cannot adjudicate leave the model answer untouched.
   assert.equal(verifyFloorplanReply("What is the balcony used for?", "It is an outdoor terrace."), "It is an outdoor terrace.");

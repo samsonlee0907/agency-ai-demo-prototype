@@ -172,12 +172,16 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
       create: async (request) => {
         requests.push(request);
         const hasImage = request.input[1].content.some((item) => item.type === "input_image");
+        const modelInput = JSON.parse(request.input[1].content[0].text);
+        const plainPlan = /^show me the level 12 floor plan$/i.test(modelInput.message);
         return {
           output_text: JSON.stringify(assistantResponse(hasImage ? {
             included: true,
             assetId: floorplan.id,
-            caption: "The restaurant and stairs are highlighted for comparison.",
-            annotation: {
+            caption: plainPlan
+              ? floorplan.description
+              : "The restaurant and stairs are highlighted for comparison.",
+            annotation: plainPlan ? null : {
               selections: [
                 { regionId: "restaurant", role: "primary", reason: "This is the requested destination." },
                 { regionId: "central_stairs", role: "secondary", reason: "This is the spatial reference." }
@@ -225,7 +229,7 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   assert.equal(grounded.floorplan.annotation.marker.kind, "direction-arrow");
   const modelInput = JSON.parse(requests[0].input[1].content[0].text);
   assert.equal(modelInput.floorplanCatalog.id, "meridian-house-level-12");
-  assert.equal(modelInput.annotationRequested, true);
+  assert.equal(modelInput.annotationAllowed, true);
   assert.doesNotMatch(JSON.stringify(modelInput.floorplanCatalog), /polygon|coordinates|axis|boundary/i);
 
   const plain = await provider.respondToTenant(
@@ -238,12 +242,74 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   assert.equal(plain.floorplan.annotation, null);
   assert.equal(plain.floorplan.caption, floorplan.description);
   const plainModelInput = JSON.parse(requests[1].input[1].content[0].text);
-  assert.equal(plainModelInput.annotationRequested, false);
-  assert.equal(plainModelInput.floorplanCatalog, null);
+  assert.equal(plainModelInput.annotationAllowed, true);
+  assert.equal(plainModelInput.floorplanCatalog.id, "meridian-house-level-12");
 
   const textOnly = await provider.respondToTenant(building, "What are the concierge hours?", []);
   assert.equal(requests[2].input[1].content.some((item) => item.type === "input_image"), false);
   assert.equal(textOnly.floorplan.included, false);
+});
+
+test("tenant provider lets the model resolve an indirect reverse route while the server draws it", async () => {
+  const requests = [];
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const modelResponse = assistantResponse({
+    included: true,
+    assetId: floorplan.id,
+    caption: "The return route from the restaurant to the Gents washroom is highlighted.",
+    annotation: {
+      selections: [
+        { regionId: "toilets_gents", role: "primary", reason: "This is the requested destination." },
+        { regionId: "restaurant", role: "secondary", reason: "This is the requested starting point." }
+      ],
+      relationship: {
+        type: "route",
+        fromRegionId: "restaurant",
+        toRegionId: "toilets_gents",
+        direction: null
+      }
+    }
+  });
+  modelResponse.reply = "From the Restaurant, head southwest into the Verandah, continue west through the Passage, then north into the Toilets block and west into the Gents washroom. This route is not checked for step-free access, door locking or emergency egress.";
+  const client = {
+    responses: {
+      create: async (request) => {
+        requests.push(request);
+        return { output_text: JSON.stringify(modelResponse) };
+      }
+    }
+  };
+  const provider = createGptProvider({
+    configured: true,
+    authMode: "api-key",
+    apiKey: "test",
+    endpoint: "https://example.openai.azure.com/openai/v1/",
+    deployment: "gpt-5.6-terra"
+  }, { client });
+
+  const result = await provider.respondToTenant(
+    findBuilding("building-meridian"),
+    "the other way round, from restaurant to gents washroom?",
+    [
+      { role: "user", content: "How do I get from the gents washroom to the restaurant?" },
+      { role: "assistant", content: "Go through the Toilets block, Passage and Verandah to the Restaurant." }
+    ],
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+  );
+
+  assert.equal(result.floorplan.annotation.relationship.type, "route");
+  assert.equal(result.floorplan.annotation.relationship.fromRegionId, "restaurant");
+  assert.equal(result.floorplan.annotation.relationship.toRegionId, "toilets_gents");
+  assert.deepEqual(
+    result.floorplan.annotation.regions.map((region) => region.id),
+    ["toilets_gents", "restaurant", "verandah", "passage", "toilets"]
+  );
+  assert.equal(result.floorplan.annotation.marker.kind, "route-path");
+  assert.equal(result.reply, modelResponse.reply);
+  const modelInput = JSON.parse(requests[0].input[1].content[0].text);
+  assert.equal(modelInput.annotationAllowed, true);
+  assert.equal(Object.hasOwn(modelInput, "floorplanRoute"), false);
+  assert.equal(modelInput.history.length, 2);
 });
 
 test("tenant floorplan grounding rejects unknown model asset identifiers", () => {
@@ -260,6 +326,29 @@ test("tenant floorplan grounding rejects unknown model asset identifiers", () =>
     ),
     ModelResponseError
   );
+});
+
+test("tenant floorplan grounding honors exclusion of a carried-over image", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const grounded = groundTenantFloorplan(
+    assistantResponse({
+      included: false,
+      assetId: "",
+      caption: "",
+      annotation: null
+    }),
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+  );
+  assert.deepEqual(grounded.floorplan, {
+    included: false,
+    assetId: "",
+    title: "",
+    floor: "",
+    imageUrl: "",
+    alt: "",
+    caption: "",
+    annotation: null
+  });
 });
 
 test("tenant floorplan grounding uses an authoritative fallback when visual intent is null", () => {
@@ -290,7 +379,7 @@ test("tenant floorplan grounding uses an authoritative fallback when visual inte
   assert.equal(grounded.floorplan.annotation.relationship.type, "count");
 });
 
-test("tenant floorplan grounding prefers authoritative fallback selections", () => {
+test("tenant floorplan grounding prefers valid model selections over phrase fallbacks", () => {
   const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
   const fallbackIntent = {
     selections: [
@@ -328,9 +417,9 @@ test("tenant floorplan grounding prefers authoritative fallback selections", () 
   );
   assert.deepEqual(grounded.floorplan.annotation.regions.map((region) => region.id), [
     "toilets",
-    "passage"
+    "restaurant"
   ]);
-  assert.equal(grounded.floorplan.annotation.marker.kind, "shared-boundary");
+  assert.equal(grounded.floorplan.annotation.marker.kind, "direction-arrow");
 });
 
 test("tenant floorplan grounding rejects unknown model region identifiers", () => {

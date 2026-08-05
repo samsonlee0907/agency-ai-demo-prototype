@@ -168,27 +168,6 @@ export function floorplanCatalogForModel(assetId) {
   };
 }
 
-/**
- * The walking route the server has already resolved for a question, in the
- * geometry-free form the model narrates from.
- */
-export function floorplanRouteForModel(assetId, fromRegionId, toRegionId) {
-  const catalog = findFloorplanRegionCatalog(assetId);
-  const route = catalog ? routeBetweenRegions(catalog, fromRegionId, toRegionId) : null;
-  if (!route) return null;
-  return {
-    note: "This is the route the verified circulation graph resolved. Narrate these steps; do not add, reorder or invent any.",
-    fromRegionId,
-    toRegionId,
-    steps: route.legs.map((leg) => ({
-      fromRegionId: leg.fromRegionId,
-      toRegionId: leg.toRegionId,
-      heading: leg.direction,
-      via: leg.via
-    }))
-  };
-}
-
 // Coarse ninth-of-the-plan placement so the model can speak about position without
 // ever receiving drawing geometry.
 function planPosition(catalog, polygon) {
@@ -634,10 +613,10 @@ export function groundFloorplanReply(message, reply) {
 // index, so they are richer than a template. They are kept only when they agree with the
 // index: a reply that states an unsupported count, wanders off the resolved route or
 // contradicts the derived orientation is replaced by the deterministic sentence.
-export function verifyFloorplanReply(message, reply) {
-  const grounded = groundedFloorplanSentence(message);
+export function verifyFloorplanReply(message, reply, annotation = null) {
+  const grounded = groundedSentenceForAnnotation(annotation) ?? groundedFloorplanSentence(message);
   if (!grounded) return reply;
-  return floorplanReplyConflicts(message, reply, grounded).length ? grounded : reply;
+  return floorplanReplyConflicts(message, reply, grounded, annotation).length ? grounded : reply;
 }
 
 const fixtureNounPattern = /\b(?:cubicles?|toilets?|wcs?|basins?|sinks?|urinals?|fixtures?|washrooms?|bathrooms?|restrooms?)\b/;
@@ -659,7 +638,14 @@ function supportedFixtureCounts(normalized) {
   return new Set(values);
 }
 
-export function floorplanReplyConflicts(message, reply, grounded) {
+function groundedSentenceForAnnotation(annotation) {
+  if (annotation?.relationship?.type !== "route") return null;
+  const { fromRegionId, toRegionId } = annotation.relationship;
+  const route = routeForRegions(fromRegionId, toRegionId);
+  return route ? describeFloorplanRoute(fromRegionId, toRegionId, route) : null;
+}
+
+export function floorplanReplyConflicts(message, reply, grounded, annotation = null) {
   const normalized = String(message || "").toLowerCase();
   const text = String(reply || "");
   if (!text.trim()) return ["The model returned no reply."];
@@ -675,11 +661,35 @@ export function floorplanReplyConflicts(message, reply, grounded) {
     }
   }
 
-  const wayfinding = floorplanRouteForMessage(normalized);
-  if (wayfinding) {
-    const onRoute = new Set(wayfinding.route.regionIds);
-    for (const id of mentionedRegionIds(text.toLowerCase())) {
+  const groundedRoute = annotation?.relationship?.type === "route"
+    ? {
+        route: routeForRegions(
+          annotation.relationship.fromRegionId,
+          annotation.relationship.toRegionId
+        )
+      }
+    : floorplanRouteForMessage(normalized);
+  if (groundedRoute?.route) {
+    const onRoute = new Set(groundedRoute.route.regionIds);
+    const mentioned = mentionedRegionIds(text.toLowerCase());
+    for (const id of mentioned) {
       if (!onRoute.has(id)) conflicts.push(`${id} is not on the resolved route.`);
+    }
+    // Natural answers often name the destination before giving directions, so
+    // enforce ordering only for intermediate rooms. Their relative order must
+    // match the canonical graph route even when either endpoint is introduced
+    // early in the sentence.
+    const intermediateIds = groundedRoute.route.regionIds.slice(1, -1);
+    const mentionedIntermediateIndexes = mentioned
+      .filter((id) => intermediateIds.includes(id))
+      .map((id) => intermediateIds.indexOf(id));
+    if (mentionedIntermediateIndexes.some((index, position) => (
+      position > 0 && index < mentionedIntermediateIndexes[position - 1]
+    ))) {
+      conflicts.push("The reply describes the route regions out of order.");
+    }
+    if (/\bno (?:connected |walking )?route\b|\b(?:does not|doesn't|is not|isn't) (?:show|draw|have) (?:a )?(?:connected |walking )?route\b/i.test(text)) {
+      conflicts.push("The verified circulation graph does contain this route.");
     }
   }
 
@@ -833,18 +843,20 @@ export function groundFloorplanAnnotation(assetId, intent) {
   const catalog = findFloorplanRegionCatalog(assetId);
   if (!catalog) throw new Error("No approved region catalog exists for this floorplan.");
   const regionsById = new Map(catalog.regions.map((region) => [region.id, region]));
-  const selectedIds = intent.selections.map((selection) => selection.regionId);
+  let selections = intent.selections;
+  let selectedIds = selections.map((selection) => selection.regionId);
   if (selectedIds.some((id) => !regionsById.has(id))) throw new Error("Unknown floorplan region identifier.");
   if (new Set(selectedIds).size !== selectedIds.length) throw new Error("Duplicate floorplan region identifier.");
-  if (!intent.selections.some((selection) => selection.role === "primary")) {
+  if (intent.relationship.type !== "route"
+    && !intent.selections.some((selection) => selection.role === "primary")) {
     throw new Error("At least one primary floorplan region is required.");
   }
 
-  let relationship = ["count", "size"].includes(intent.relationship.type)
+  let relationship = ["count", "size", "route"].includes(intent.relationship.type)
     ? {
         ...intent.relationship,
-        fromRegionId: null,
-        toRegionId: null,
+        fromRegionId: intent.relationship.type === "route" ? intent.relationship.fromRegionId : null,
+        toRegionId: intent.relationship.type === "route" ? intent.relationship.toRegionId : null,
         direction: null
       }
     : intent.relationship;
@@ -866,7 +878,37 @@ export function groundFloorplanAnnotation(assetId, intent) {
       )
     };
   }
-  const regions = intent.selections.map((selection) => {
+  let route = null;
+  if (relationship.type === "route") {
+    route = routeBetweenRegions(catalog, relationship.fromRegionId, relationship.toRegionId);
+    if (!route) throw new Error("The plan does not draw a connected route between the selected regions.");
+    const supplied = new Map(selections.map((selection) => [selection.regionId, selection]));
+    const endpointIds = new Set([relationship.fromRegionId, relationship.toRegionId]);
+    // The model identifies semantic endpoints. The graph owns every intermediate
+    // room, role and waypoint, so irrelevant or omitted model selections cannot
+    // distort the rendered route.
+    selections = [
+      {
+        regionId: relationship.toRegionId,
+        role: "primary",
+        reason: supplied.get(relationship.toRegionId)?.reason || "This is the requested destination."
+      },
+      {
+        regionId: relationship.fromRegionId,
+        role: "secondary",
+        reason: supplied.get(relationship.fromRegionId)?.reason || "This is the requested starting point."
+      },
+      ...route.regionIds
+        .filter((id) => !endpointIds.has(id))
+        .map((id) => ({
+          regionId: id,
+          role: "context",
+          reason: "The verified route passes through here."
+        }))
+    ];
+  }
+
+  const regions = selections.map((selection) => {
     const region = regionsById.get(selection.regionId);
     return {
       id: region.id,
@@ -881,14 +923,6 @@ export function groundFloorplanAnnotation(assetId, intent) {
   });
 
   let marker = null;
-  let route = null;
-  if (relationship.type === "route") {
-    route = routeBetweenRegions(catalog, relationship.fromRegionId, relationship.toRegionId);
-    if (!route) throw new Error("The plan does not draw a connected route between the selected regions.");
-    if (route.regionIds.some((id) => !selectedIds.includes(id))) {
-      throw new Error("Every region a route passes through must be a selected region.");
-    }
-  }
   const transition = intent.selections
     .map((selection) => regionsById.get(selection.regionId))
     .find((region) => region.type === "transition"

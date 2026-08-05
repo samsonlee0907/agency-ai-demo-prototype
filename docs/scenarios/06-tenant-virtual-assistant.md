@@ -186,7 +186,7 @@ For a relevant Meridian House question, the server resolves the asset from its f
 }
 ```
 
-The browser never supplies an image URL, asset ID, file path, or image bytes. GPT-5.6 Terra receives the image only when the current message mentions a floorplan, layout, navigation, or a feature represented on the plan. Image input uses `detail: "original"` because floorplans contain dense labels and spatial relationships.
+The browser never supplies an image URL, asset ID, file path, or image bytes. GPT-5.6 Terra receives the image only when the current message mentions a floorplan, layout, navigation, or a feature represented on the plan. A contextual follow-up such as "reverse that route" also keeps the image when a recent turn established floorplan context. Image input uses `detail: "original"` because floorplans contain dense labels and spatial relationships.
 
 The model-facing region catalog contains semantic descriptions but no polygons, boundaries, label anchors, dimensions, or SVG. Terra can select regions but cannot author rendering geometry.
 
@@ -214,7 +214,8 @@ Terra is instructed to:
 - return only approved region IDs, `primary`/`secondary`/`context` roles, relationship intent, optional direction, and short reasons;
 - return `annotation: null` when no validated catalog region confidently supports the answer;
 - never return coordinates, boxes, polygons, paths, SVG, colors, labels, or dimensions;
-- never invent door connectivity: the server supplies the verified circulation graph and the computed route, and the model narrates that route rather than deducing its own;
+- infer the user's semantic intent and endpoint order from natural language, conversation and image, including indirect follow-ups such as "the other way round";
+- use only listed circulation links when narrating a route; the server independently computes and draws the canonical intermediate path from the selected endpoint IDs;
 - distinguish visible layout interpretation from authoritative building policy;
 - never present a static plan as proof of accessibility, current obstructions, occupancy, or emergency routes;
 - prioritize emergency safety.
@@ -287,7 +288,7 @@ type AssistantResponse = {
 
 After Zod validation, the provider applies three behavioral controls:
 
-1. **Floorplan grounding:** when no image was supplied, any returned floorplan or annotation ID is rejected. When an image was supplied, unknown or duplicate region IDs, inconsistent endpoints, and undeclared adjacency claims are rejected. The server replaces attachment metadata and every selected region with authoritative labels, source-pixel polygons, dimensions, and renderer hints. Model output has no geometry fields.
+1. **Floorplan grounding:** when no image was supplied, any returned floorplan or annotation ID is rejected. When an image was supplied, unknown or duplicate region IDs, inconsistent endpoints, and undeclared adjacency claims are rejected. A valid Live model intent takes precedence over phrase-based fallbacks. For a route, the model supplies only the semantic origin and destination; the server discards unrelated selections, computes every intermediate region and doorway, and replaces all IDs with authoritative labels, source-pixel polygons, dimensions, and renderer hints. Model output has no geometry fields.
 2. **Question normalization:** any suggestion ending in `?` is removed from the button list and appended to Aurelia's `reply` when it fits within the 1,600-character limit.
 3. **Emergency guidance:** when `urgency` is `Emergency` and the reply does not contain `000`, the server prepends explicit emergency-services guidance, truncating the original response if necessary.
 
@@ -327,10 +328,10 @@ The split of responsibilities is:
 | Layer | Owns |
 | --- | --- |
 | Deterministic index and graph | Which rooms exist, their geometry, which openings connect them, and the exact route drawn on the plan |
-| GPT-5.6 Terra | Reading the question, resolving the endpoints, and writing the comprehensive answer using both the image and the geometry-free route summary |
+| GPT-5.6 Terra | Reading unconstrained natural language and conversation, deciding the visual relationship, resolving route endpoints, and writing the comprehensive answer from the image and geometry-free catalog |
 | Server verification | Substituting the deterministic sentence when the model's prose contradicts the index |
 
-Terra receives the route as region IDs, a compass heading and the opening type only — never coordinates. The `route-path` marker is built entirely from server waypoints (`fromRegion.labelAnchor`, each doorway in order, `toRegion.labelAnchor`), so the drawn polyline cannot cross a wall.
+Terra receives the region catalog and geometry-free circulation links but never coordinates. It returns only semantic route endpoints. The server then computes the canonical route and builds the `route-path` marker entirely from server waypoints (`fromRegion.labelAnchor`, each doorway in order, `toRegion.labelAnchor`), so omitted or irrelevant model selections cannot distort the route and the drawn polyline cannot cross a wall.
 
 `verifyFloorplanReply()` verifies rather than replaces. When a question has no deterministic answer the model's reply passes through untouched. When it does, the reply is checked for fixture counts absent from the index, catalogued regions that are not on the resolved route, and compass directions that contradict the grounded sentence; any conflict substitutes the deterministic sentence.
 

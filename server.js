@@ -247,7 +247,11 @@ app.post("/api/assistant", async (request, response, next) => {
     const building = resolveBuilding(buildingId);
     let output;
     if (mode === "live") {
-      const floorplan = findFloorplanForMessage(building, resolveFloorplanAnaphora(message, history));
+      const floorplan = findFloorplanForMessage(
+        building,
+        resolveFloorplanAnaphora(message, history),
+        history
+      );
       const floorplanInput = floorplan ? await loadFloorplanImage(root, floorplan) : null;
       output = await requireLiveProvider(runtime.gpt, runtime.config.gpt.deployment)
         .respondToTenant(building, message, history, floorplanInput);
