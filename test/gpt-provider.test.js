@@ -244,6 +244,12 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   const plainModelInput = JSON.parse(requests[1].input[1].content[0].text);
   assert.equal(plainModelInput.annotationAllowed, true);
   assert.equal(plainModelInput.floorplanCatalog.id, "meridian-house-level-12");
+  const tenantInstructions = requests[1].input[0].content[0].text;
+  assert.match(tenantInstructions, /broad request .* is an overview/i);
+  assert.match(tenantInstructions, /at most two concise sentences/i);
+  assert.match(tenantInstructions, /keep the original plan unannotated/i);
+  assert.match(tenantInstructions, /do not enumerate individual toilet fixtures/i);
+  assert.match(tenantInstructions, /route safety disclaimer .* precedence over brevity/i);
 
   const textOnly = await provider.respondToTenant(building, "What are the concierge hours?", []);
   assert.equal(requests[2].input[1].content.some((item) => item.type === "input_image"), false);

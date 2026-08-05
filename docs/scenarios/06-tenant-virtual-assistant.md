@@ -211,6 +211,7 @@ Terra is instructed to:
 - create a work order only for an actionable facilities fault;
 - cite supplied articles or contact details;
 - use a floorplan only when the approved image was supplied;
+- answer broad plan or amenity overviews in at most two concise sentences, without unasked fixture details, and keep the original plan unannotated;
 - return only approved region IDs, `primary`/`secondary`/`context` roles, relationship intent, optional direction, and short reasons;
 - return `annotation: null` when no validated catalog region confidently supports the answer;
 - never return coordinates, boxes, polygons, paths, SVG, colors, labels, or dimensions;
