@@ -328,6 +328,29 @@ test("tenant floorplan grounding rejects unknown model asset identifiers", () =>
   );
 });
 
+test("tenant floorplan grounding honors exclusion of a carried-over image", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const grounded = groundTenantFloorplan(
+    assistantResponse({
+      included: false,
+      assetId: "",
+      caption: "",
+      annotation: null
+    }),
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+  );
+  assert.deepEqual(grounded.floorplan, {
+    included: false,
+    assetId: "",
+    title: "",
+    floor: "",
+    imageUrl: "",
+    alt: "",
+    caption: "",
+    annotation: null
+  });
+});
+
 test("tenant floorplan grounding uses an authoritative fallback when visual intent is null", () => {
   const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
   const fallbackIntent = {
