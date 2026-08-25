@@ -309,6 +309,11 @@ const maintenanceEvidenceSchema = z.object({
   interpretation: z.string().min(10).max(500)
 });
 
+const maintenanceModelEvidenceSchema = z.object({
+  signalId: z.string().min(1),
+  interpretation: z.string().min(10).max(500)
+}).strict();
+
 export const maintenanceOutputSchema = z.object({
   healthScore: z.number().int().min(0).max(100),
   failureRisk: z.enum(["Low", "Moderate", "High", "Critical"]),
@@ -336,6 +341,10 @@ export const maintenanceOutputSchema = z.object({
     status: z.string().max(120)
   }),
   assumptions: z.array(z.string().min(5).max(300)).min(1).max(5)
+});
+
+export const maintenanceModelOutputSchema = maintenanceOutputSchema.extend({
+  evidence: z.array(maintenanceModelEvidenceSchema).min(2).max(5)
 });
 
 export const esgRequestSchema = z.object({
@@ -703,12 +712,9 @@ export const maintenanceJsonSchema = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["signalId", "label", "reading", "severity", "interpretation"],
+        required: ["signalId", "interpretation"],
         properties: {
           signalId: { type: "string" },
-          label: { type: "string" },
-          reading: { type: "string" },
-          severity: { type: "string", enum: ["Normal", "Watch", "Elevated", "Critical"] },
           interpretation: { type: "string" }
         }
       }

@@ -20,6 +20,7 @@ import {
   matchJsonSchema,
   matchOutputSchema,
   maintenanceJsonSchema,
+  maintenanceModelOutputSchema,
   maintenanceOutputSchema,
   marketingJsonSchema,
   marketingOutputSchema,
@@ -391,12 +392,18 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
     async analyseMaintenance(asset, horizon, baseline) {
       const result = await generateStructured({
         name: "predictive_maintenance_analysis",
-        instructions: "You are a facilities condition-monitoring copilot. Diagnose only from the supplied fictional asset metadata and telemetry. Distinguish observed signals from predicted risk, explain uncertainty, prioritise safe technician verification, and never claim the language model itself measured the equipment. Use only supplied signal IDs and do not invent readings, costs or emissions.",
+        instructions: "You are a facilities condition-monitoring copilot. Diagnose only from the supplied fictional asset metadata and telemetry. Distinguish observed signals from predicted risk, explain uncertainty, prioritise safe technician verification, and never claim the language model itself measured the equipment. Use only supplied signal IDs. For each evidence item, return only signalId and a concise interpretation; the server supplies the measured label, reading and severity. Do not invent readings, costs or emissions.",
         input: { asset, horizonDays: horizon, analysisDate: "16 July 2026" },
         jsonSchema: maintenanceJsonSchema,
-        outputSchema: maintenanceOutputSchema
+        outputSchema: maintenanceModelOutputSchema
       });
-      return groundMaintenanceAnalysis(result, asset, baseline);
+      const grounded = groundMaintenanceAnalysis(result, asset, baseline);
+      const validated = maintenanceOutputSchema.safeParse(grounded);
+      if (!validated.success) {
+        const issue = validated.error.issues[0];
+        throw new ModelResponseError(`Grounded maintenance response failed validation at ${issue.path.join(".")}: ${issue.message}`);
+      }
+      return validated.data;
     },
     async draftEsgReport(settings, evidence) {
       const result = await generateStructured({

@@ -14,7 +14,12 @@ import {
 } from "../src/providers/gpt.js";
 import { findBuilding } from "../src/data.js";
 import { findFloorplanAsset } from "../src/floorplan-assets.js";
-import { ASSISTANT_REPLY_MAX_LENGTH, assistantOutputSchema } from "../src/schemas.js";
+import {
+  ASSISTANT_REPLY_MAX_LENGTH,
+  assistantOutputSchema,
+  maintenanceModelOutputSchema,
+  maintenanceOutputSchema
+} from "../src/schemas.js";
 
 const sources = [
   { id: "comp-one", address: "1 Sample Street", area: "Sydney", saleDate: "1 Jul 2026", salePrice: 1000000 },
@@ -84,9 +89,6 @@ test("maintenance grounding restores source readings and rejects invented signal
     forecastWindow: "Fabricated",
     evidence: asset.signals.map((signal) => ({
       signalId: signal.id,
-      label: "Fabricated",
-      reading: "Fabricated",
-      severity: "Elevated",
       interpretation: "A grounded interpretation of the supplied trend."
     })),
     energyImpact: { excessKwhPerDay: 1, costPerMonth: 1, annualEmissionsTonnes: 1, narrative: "Grounded source impact narrative." }
@@ -100,6 +102,25 @@ test("maintenance grounding restores source readings and rejects invented signal
     () => groundMaintenanceAnalysis({ ...result, evidence: [{ ...result.evidence[0], signalId: "invented" }, ...result.evidence.slice(1)] }, asset, baseline),
     ModelResponseError
   );
+});
+
+test("maintenance model evidence contains only the signal identifier and interpretation", () => {
+  const asset = findMaintenanceAsset("asset-meridian-chiller-02");
+  const baseline = analyseMaintenance(asset.id, 30);
+  const draft = {
+    ...baseline,
+    evidence: baseline.evidence.map((item) => ({
+      signalId: item.signalId,
+      interpretation: "This approved signal supports the deterministic maintenance assessment."
+    }))
+  };
+
+  assert.equal(maintenanceModelOutputSchema.safeParse(draft).success, true);
+  assert.equal(maintenanceModelOutputSchema.safeParse({
+    ...draft,
+    evidence: [{ ...draft.evidence[0], reading: "This untrusted display value must not be model output." }, ...draft.evidence.slice(1)]
+  }).success, false);
+  assert.equal(maintenanceOutputSchema.safeParse(groundMaintenanceAnalysis(draft, asset, baseline)).success, true);
 });
 
 test("ESG grounding restores calculated metrics and requires the complete evidence set", () => {
