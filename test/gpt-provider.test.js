@@ -385,7 +385,7 @@ test("tenant provider substitutes a labelled-area capacity estimate for a model 
   );
 
   assert.match(result.reply, /15 reviewed four-seat dining tables, for 60 table seats/);
-  assert.match(result.reply, /not a seating schedule, fire-code occupancy limit or certified building capacity/i);
+  assert.match(result.reply, /not a fire-code occupancy limit or certified building capacity/i);
   const modelInput = JSON.parse(requests[0].input[1].content[0].text);
   assert.deepEqual(modelInput.capacityPlanning.estimates[0], {
     regionId: "restaurant",
@@ -394,6 +394,33 @@ test("tenant provider substitutes a labelled-area capacity estimate for a model 
     diningTableCount: 15,
     diningSeatCount: 60
   });
+});
+
+test("tenant provider resolves a balcony seating follow-up from floorplan context", async () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const client = {
+    responses: {
+      create: async () => {
+        const response = assistantResponse({
+          included: true,
+          assetId: floorplan.id,
+          caption: "",
+          annotation: null
+        });
+        response.reply = "I do not have a verified balcony seating figure.";
+        return { output_text: JSON.stringify(response) };
+      }
+    }
+  };
+  const result = await liveProvider(client).respondToTenant(
+    findBuilding("building-meridian"),
+    "what about balcony?",
+    [{ role: "user", content: "What capacity can the restaurant contain?" }],
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+  );
+
+  assert.match(result.reply, /4 reviewed four-seat dining tables, for 16 table seats/);
+  assert.deepEqual(result.floorplan.annotation.regions.map((region) => region.id), ["balcony"]);
 });
 
 test("tenant provider lets the model resolve an indirect reverse route while the server draws it", async () => {

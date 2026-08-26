@@ -663,7 +663,7 @@ function floorplanIntent(selections, type, fromRegionId = null, toRegionId = nul
   };
 }
 
-function mockFloorplanAnswer(normalized) {
+function mockFloorplanAnswer(normalized, history = []) {
   const select = (regionId, role, reason) => ({ regionId, role, reason });
   const plainPlan = () => ({
     reply: "The Level 12 plan shows three office areas around a central stair and storage core, with toilets to the west and reception, restaurant, kitchen and amenity areas to the east.",
@@ -671,13 +671,13 @@ function mockFloorplanAnswer(normalized) {
     annotation: null,
     plain: true
   });
-  if (!floorplanAnnotationRequested(normalized)) return plainPlan();
-  const capacityPlanning = floorplanCapacityPlanningForMessage(normalized);
+  const capacityPlanning = floorplanCapacityPlanningForMessage(normalized, history);
+  if (!floorplanAnnotationRequested(normalized) && !capacityPlanning) return plainPlan();
   if (capacityPlanning) {
     return {
       reply: formatFloorplanCapacityPlanning(capacityPlanning),
       caption: "The labelled areas used for this best-effort planning estimate are highlighted.",
-      annotation: floorplanAnnotationFallbackForMessage(normalized)
+      annotation: floorplanAnnotationFallbackForMessage(normalized, history)
     };
   }
   // Wayfinding is resolved from the shared circulation graph before any hand-written
@@ -813,9 +813,9 @@ function answerTenantNonEmergency(building, normalized, history = []) {
 
   if (floorplan) {
     const floorplanGuide = findKnowledge(/floor plan|floorplan|layout/i);
-    const floorplanAnswer = mockFloorplanAnswer(grounding);
+    const floorplanAnswer = mockFloorplanAnswer(grounding, history);
     const fallbackIntent = floorplanAnnotationRequested(grounding)
-      ? floorplanAnnotationFallbackForMessage(grounding)
+      ? floorplanAnnotationFallbackForMessage(grounding, history)
       : null;
     const intent = floorplanAnswer.annotation ?? fallbackIntent;
     const annotation = groundFloorplanAnnotation(floorplan.id, intent);

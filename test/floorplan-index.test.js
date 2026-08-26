@@ -73,6 +73,10 @@ test("region facts are derived from fixture geometry, not authored", () => {
     diningTableCount: 15,
     diningSeatCount: 60
   });
+  assert.deepEqual(factsFor("balcony"), {
+    diningTableCount: 4,
+    diningSeatCount: 16
+  });
 });
 
 test("every fixture sits inside exactly one leaf room", () => {
@@ -128,9 +132,10 @@ test("every circulation link sits on a threshold shared by both rooms", () => {
       );
     }
   }
-  // Every region the assistant can route to has to be reachable from the graph.
+  // Every non-outdoor region the assistant can route to has to be reachable from
+  // the graph. The balcony is indexed for seating questions, not as a verified route.
   const connected = new Set(links.flatMap((link) => link.regionIds));
-  for (const region of index.regions) {
+  for (const region of index.regions.filter((region) => region.type !== "outdoor")) {
     assert.ok(connected.has(region.id), `${region.id} has no drawn circulation link`);
   }
 });

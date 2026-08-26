@@ -8,6 +8,7 @@ import {
 import {
   floorplanCatalogForModel,
   floorplanCapacityPlanningForMessage,
+  floorplanAnnotationFallbackForMessage,
   groundFloorplanCapacityReply,
   groundFloorplanAnnotation,
   verifyFloorplanReply
@@ -97,7 +98,7 @@ export function groundTenantFloorplan(result, floorplan, allowAnnotation = true,
   // The server may carry the image for one turn so Terra can understand an
   // unrestricted follow-up. If the current question is unrelated, honor the
   // model's explicit exclusion instead of reattaching the original plan.
-  if (!modelAttachment.included) {
+  if (!modelAttachment.included && !fallbackIntent) {
     return { ...result, floorplan: emptyFloorplanAttachment() };
   }
   let annotation = null;
@@ -390,7 +391,10 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
         ? floorplanCatalogForModel(floorplan.asset.id)
         : null;
       const capacityPlanning = floorplan
-        ? floorplanCapacityPlanningForMessage(message)
+        ? floorplanCapacityPlanningForMessage(message, history)
+        : null;
+      const capacityFallbackIntent = capacityPlanning
+        ? floorplanAnnotationFallbackForMessage(message, history)
         : null;
       const result = await generateStructured({
         name: "tenant_assistant_response",
@@ -405,7 +409,8 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
       const grounded = groundTenantFloorplan(
         result,
         floorplan,
-        annotationAllowed
+        annotationAllowed,
+        capacityFallbackIntent
       );
       grounded.reply = groundFloorplanCapacityReply(verifyFloorplanReply(
         message,

@@ -202,7 +202,8 @@ const contextByTarget = {
   toilets_gents: "toilets_ladies",
   passage: "toilets",
   kitchen: "reception",
-  verandah: "restaurant"
+  verandah: "restaurant",
+  balcony: "restaurant"
 };
 const capacityInquiryPattern = /\b(?:capacity|occupancy|occupants?|people|persons?|diners?|seats?|seating|hold|contain|fit)\b/;
 const planningDensityByRegionType = {
@@ -221,6 +222,7 @@ const toiletMentionPattern = /\b(?:toilets?|washrooms?|bathrooms?|restrooms?|cub
 const regionMentionPatterns = [
   ["reception", /\breception\b/],
   ["restaurant", /\b(?:restaurant|dining)\b/],
+  ["balcony", /\bbalcony\b/],
   ["central_stairs", /\bstairs?\b/],
   ["toilets", toiletMentionPattern],
   ["passage", /\bpassage\b/],
@@ -276,9 +278,11 @@ function findRegionById(regionId) {
 
 function capacityRegionIdsForMessage(normalized) {
   const hasRestaurant = /\b(?:restaurant|dining)\b/.test(normalized);
+  const hasBalcony = /\bbalcony\b/.test(normalized);
   const hasOffice = /\boffices?\b/.test(normalized);
   const ids = [];
   if (hasRestaurant) ids.push("restaurant");
+  if (hasBalcony) ids.push("balcony");
   if (hasOffice) {
     if (/\b(?:largest|biggest|114\.4)\b/.test(normalized)) {
       ids.push("office_114_4");
@@ -301,7 +305,7 @@ function userSuppliedSeatingCount(normalized) {
 }
 
 function planningEstimateForRegion(region) {
-  if (region.id === "restaurant" && region.facts?.diningSeatCount) {
+  if (region.facts?.diningSeatCount) {
     return {
       regionId: region.id,
       label: region.label,
@@ -328,9 +332,10 @@ function planningEstimateForRegion(region) {
   };
 }
 
-export function floorplanCapacityPlanningForMessage(message) {
+export function floorplanCapacityPlanningForMessage(message, history = []) {
   const normalized = String(message || "").toLowerCase();
-  if (!capacityInquiryPattern.test(normalized)) return null;
+  const historyIncludesCapacity = history.some((turn) => capacityInquiryPattern.test(String(turn?.content || "").toLowerCase()));
+  if (!capacityInquiryPattern.test(normalized) && !historyIncludesCapacity) return null;
   const regionIds = capacityRegionIdsForMessage(normalized);
   const estimates = regionIds
     .map(findRegionById)
@@ -345,7 +350,7 @@ export function floorplanCapacityPlanningForMessage(message) {
     estimates,
     suppliedRestaurantSeats,
     restaurantAreaSqm: restaurant.areaSqm,
-    disclaimer: "This is a best-effort space-planning estimate, not a seating schedule, fire-code occupancy limit or certified building capacity."
+    disclaimer: "These reviewed seating symbols and area comparisons are not a fire-code occupancy limit or certified building capacity."
   };
 }
 
@@ -535,14 +540,14 @@ export function resolveFloorplanAnaphora(message, history = []) {
     + normalized.slice(match.index + match[0].length);
 }
 
-export function floorplanAnnotationFallbackForMessage(message) {
+export function floorplanAnnotationFallbackForMessage(message, history = []) {
   const normalized = String(message || "").toLowerCase();
   const select = (regionId, role, reason) => ({ regionId, role, reason });
   const regionIds = mentionedRegionIds(normalized);
   const mentionsToilets = toiletMentionPattern.test(normalized);
   const toiletRegionId = resolveToiletRegionId(normalized);
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
-  const capacityPlanning = floorplanCapacityPlanningForMessage(normalized);
+  const capacityPlanning = floorplanCapacityPlanningForMessage(normalized, history);
   if (capacityPlanning) {
     return {
       selections: capacityPlanning.estimates.map((estimate) => (

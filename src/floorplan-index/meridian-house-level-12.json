@@ -31,6 +31,17 @@
       "labelAnchor": { "x": 820, "y": 500 }
     },
     {
+      "id": "balcony",
+      "label": "Balcony",
+      "type": "outdoor",
+      "areaSqm": 91.7,
+      "description": "The labelled 91.7 m² balcony above the offices and immediately north-west of the restaurant.",
+      "polygon": [
+        { "x": 283, "y": 52 }, { "x": 689, "y": 52 }, { "x": 689, "y": 238 }, { "x": 283, "y": 238 }
+      ],
+      "labelAnchor": { "x": 510, "y": 145 }
+    },
+    {
       "id": "office_west_64_2",
       "label": "West office 64.2 m²",
       "proseName": "west 64.2 m² office",
@@ -176,7 +187,11 @@
     { "id": "restaurant_table_main_3", "kind": "dining_table", "seatCount": 4, "at": { "x": 775, "y": 500 } },
     { "id": "restaurant_table_main_4", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 500 } },
     { "id": "restaurant_table_main_5", "kind": "dining_table", "seatCount": 4, "at": { "x": 775, "y": 570 } },
-    { "id": "restaurant_table_main_6", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 570 } }
+    { "id": "restaurant_table_main_6", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 570 } },
+    { "id": "balcony_table_1", "kind": "dining_table", "seatCount": 4, "at": { "x": 342, "y": 112 } },
+    { "id": "balcony_table_2", "kind": "dining_table", "seatCount": 4, "at": { "x": 438, "y": 112 } },
+    { "id": "balcony_table_3", "kind": "dining_table", "seatCount": 4, "at": { "x": 537, "y": 112 } },
+    { "id": "balcony_table_4", "kind": "dining_table", "seatCount": 4, "at": { "x": 632, "y": 112 } }
   ],
   "relations": [
     {
