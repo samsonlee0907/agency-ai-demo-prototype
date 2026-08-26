@@ -64,10 +64,15 @@ test("region facts are derived from fixture geometry, not authored", () => {
   const gents = factsFor("toilets_gents");
   const ladies = factsFor("toilets_ladies");
   const block = factsFor("toilets");
+  const restaurant = factsFor("restaurant");
   assert.equal(block.enclosedCubicleCount, gents.enclosedCubicleCount + ladies.enclosedCubicleCount);
   assert.equal(block.basinCount, gents.basinCount + ladies.basinCount);
   assert.equal(block.urinalCount, gents.urinalCount + ladies.urinalCount);
   assert.equal(block.totalFixtureCount, gents.totalFixtureCount + ladies.totalFixtureCount);
+  assert.deepEqual(restaurant, {
+    diningTableCount: 15,
+    diningSeatCount: 60
+  });
 });
 
 test("every fixture sits inside exactly one leaf room", () => {
@@ -99,6 +104,11 @@ test("the validator rejects fixtures and children that fall outside their room",
   const duplicated = readIndex();
   duplicated.fixtures.push({ ...duplicated.fixtures[0] });
   assert.ok(validateFloorplanIndex(duplicated).some((error) => error.includes("Duplicate fixture ID")));
+
+  const tableWithoutSeats = readIndex();
+  const restaurantTable = tableWithoutSeats.fixtures.find((fixture) => fixture.kind === "dining_table");
+  delete restaurantTable.seatCount;
+  assert.ok(validateFloorplanIndex(tableWithoutSeats).some((error) => error.includes("must have a seat count")));
 
   const badRelation = readIndex();
   badRelation.relations.push({ type: "adjacent", regionIds: ["toilets", "nowhere"] });

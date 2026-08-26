@@ -50,6 +50,7 @@ test("model catalog exposes semantics without any renderer geometry", () => {
   assert.equal(modelCatalog.regions.length, FLOORPLAN_REGION_IDS.length);
   assert.doesNotMatch(serialized, /polygon|labelAnchor|boundary|axis|coordinates/i);
   const toilets = modelCatalog.regions.find((region) => region.id === "toilets");
+  const restaurant = modelCatalog.regions.find((region) => region.id === "restaurant");
   assert.deepEqual(toilets.facts, {
     genderDesignation: "separate gents and ladies washrooms",
     enclosedCubicleCount: 5,
@@ -72,6 +73,10 @@ test("model catalog exposes semantics without any renderer geometry", () => {
     totalFixtureCount: 8,
     basinCount: 2,
     urinalCount: 4
+  });
+  assert.deepEqual(restaurant.facts, {
+    diningTableCount: 15,
+    diningSeatCount: 60
   });
 
   assert.equal(toilets.position, "north-west");

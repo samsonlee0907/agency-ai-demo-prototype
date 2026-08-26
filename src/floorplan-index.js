@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const indexDirectory = join(dirname(fileURLToPath(import.meta.url)), "floorplan-index");
 
-export const FLOORPLAN_FIXTURE_KINDS = Object.freeze(["wc", "urinal", "basin"]);
+export const FLOORPLAN_FIXTURE_KINDS = Object.freeze(["wc", "urinal", "basin", "dining_table"]);
 
 // Doorway points are read off the raster by eye, so a small tolerance is allowed when
 // checking that a threshold really touches both of the regions it joins.
@@ -48,6 +48,13 @@ function deriveFacts(region, fixtures) {
   const inside = fixturesInside(region, fixtures);
   if (!inside.length && !region.genderDesignation) return null;
   const countOf = (kind) => inside.filter((fixture) => fixture.kind === kind).length;
+  const diningTables = inside.filter((fixture) => fixture.kind === "dining_table");
+  if (diningTables.length) {
+    return {
+      diningTableCount: diningTables.length,
+      diningSeatCount: diningTables.reduce((total, fixture) => total + fixture.seatCount, 0)
+    };
+  }
   return {
     genderDesignation: region.genderDesignation ?? null,
     enclosedCubicleCount: countOf("wc"),
@@ -83,6 +90,13 @@ export function validateFloorplanIndex(index) {
     fixtureIds.add(fixture.id);
     if (!FLOORPLAN_FIXTURE_KINDS.includes(fixture.kind)) {
       errors.push(`Fixture ${fixture.id} has an unsupported kind: ${fixture.kind}.`);
+    }
+    if (fixture.kind === "dining_table"
+      && (!Number.isInteger(fixture.seatCount) || fixture.seatCount < 1 || fixture.seatCount > 12)) {
+      errors.push(`Dining table ${fixture.id} must have a seat count from 1 to 12.`);
+    }
+    if (fixture.kind !== "dining_table" && fixture.seatCount !== undefined) {
+      errors.push(`Only a dining table may declare a seat count: ${fixture.id}.`);
     }
     const containing = leafRegions.filter((region) => pointInPolygon(fixture.at, region.polygon));
     if (containing.length !== 1) {

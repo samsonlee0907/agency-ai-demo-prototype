@@ -123,7 +123,7 @@ test("tenant assistant returns labelled-area planning estimates for restaurant a
     "If the restaurant seating plan holds 120 people, how many can the largest office hold at the same average area per person?"
   );
 
-  assert.match(restaurant.reply, /115–148 people/);
+  assert.match(restaurant.reply, /15 reviewed four-seat dining tables, for 60 table seats/);
   assert.match(restaurant.reply, /not a seating schedule, fire-code occupancy limit or certified building capacity/i);
   assert.deepEqual(restaurant.floorplan.annotation.regions.map((region) => region.id), ["restaurant"]);
   assert.match(offices.reply, /West office 64\.2 m².*5–8 people/);
@@ -133,7 +133,8 @@ test("tenant assistant returns labelled-area planning estimates for restaurant a
     "office_east_64_2",
     "office_114_4"
   ]);
-  assert.match(reference.reply, /about 66 people; that is an area comparison, not an office-layout recommendation/i);
+  assert.match(reference.reply, /60 table seats.*about 33 people; that is not an office-layout recommendation/i);
+  assert.match(reference.reply, /takes precedence over the supplied 120-seat assumption/i);
 });
 
 test("tenant assistant resolves a follow-up pronoun from the conversation", () => {

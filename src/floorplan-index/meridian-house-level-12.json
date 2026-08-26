@@ -6,7 +6,7 @@
   "provenance": {
     "method": "model-proposed, human-reviewed",
     "sourceImage": "public/assets/floorplans/meridian-house-level-12-floorplan.jpeg",
-    "notes": "Region polygons and fixture points were read from the source raster and checked by rendering them back over the image. Counts are never authored here: they are derived by testing which fixture points fall inside which region polygon. Every connects relation marks a doorway, sliding partition or open threshold that is actually drawn on the plan, so routes are searched over verified circulation rather than inferred."
+    "notes": "Region polygons and fixture points were read from the source raster and checked by rendering them back over the image. Fixture counts, including restaurant table seats, are derived by testing which reviewed fixture points fall inside which region polygon. Every connects relation marks a doorway, sliding partition or open threshold that is actually drawn on the plan, so routes are searched over verified circulation rather than inferred."
   },
   "regions": [
     {
@@ -161,7 +161,22 @@
     { "id": "basin_ladies_1", "kind": "basin", "at": { "x": 131, "y": 296 } },
     { "id": "basin_ladies_2", "kind": "basin", "at": { "x": 151, "y": 296 } },
     { "id": "basin_ladies_3", "kind": "basin", "at": { "x": 171, "y": 296 } },
-    { "id": "basin_ladies_4", "kind": "basin", "at": { "x": 190, "y": 296 } }
+    { "id": "basin_ladies_4", "kind": "basin", "at": { "x": 190, "y": 296 } },
+    { "id": "restaurant_table_west_1", "kind": "dining_table", "seatCount": 4, "at": { "x": 715, "y": 315 } },
+    { "id": "restaurant_table_west_2", "kind": "dining_table", "seatCount": 4, "at": { "x": 715, "y": 400 } },
+    { "id": "restaurant_table_west_3", "kind": "dining_table", "seatCount": 4, "at": { "x": 715, "y": 485 } },
+    { "id": "restaurant_table_north_1", "kind": "dining_table", "seatCount": 4, "at": { "x": 775, "y": 285 } },
+    { "id": "restaurant_table_north_2", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 285 } },
+    { "id": "restaurant_table_north_3", "kind": "dining_table", "seatCount": 4, "at": { "x": 915, "y": 285 } },
+    { "id": "restaurant_table_north_4", "kind": "dining_table", "seatCount": 4, "at": { "x": 775, "y": 345 } },
+    { "id": "restaurant_table_north_5", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 345 } },
+    { "id": "restaurant_table_north_6", "kind": "dining_table", "seatCount": 4, "at": { "x": 915, "y": 345 } },
+    { "id": "restaurant_table_main_1", "kind": "dining_table", "seatCount": 4, "at": { "x": 775, "y": 420 } },
+    { "id": "restaurant_table_main_2", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 420 } },
+    { "id": "restaurant_table_main_3", "kind": "dining_table", "seatCount": 4, "at": { "x": 775, "y": 500 } },
+    { "id": "restaurant_table_main_4", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 500 } },
+    { "id": "restaurant_table_main_5", "kind": "dining_table", "seatCount": 4, "at": { "x": 775, "y": 570 } },
+    { "id": "restaurant_table_main_6", "kind": "dining_table", "seatCount": 4, "at": { "x": 845, "y": 570 } }
   ],
   "relations": [
     {

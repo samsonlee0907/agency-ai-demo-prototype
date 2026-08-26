@@ -301,6 +301,15 @@ function userSuppliedSeatingCount(normalized) {
 }
 
 function planningEstimateForRegion(region) {
+  if (region.id === "restaurant" && region.facts?.diningSeatCount) {
+    return {
+      regionId: region.id,
+      label: region.label,
+      areaSqm: region.areaSqm,
+      diningTableCount: region.facts.diningTableCount,
+      diningSeatCount: region.facts.diningSeatCount
+    };
+  }
   const density = region.id === "restaurant"
     ? planningDensityByRegionType.restaurant
     : region.id.startsWith("office_")
@@ -331,9 +340,7 @@ export function floorplanCapacityPlanningForMessage(message) {
 
   const restaurant = estimates.find((estimate) => estimate.regionId === "restaurant")
     || planningEstimateForRegion(findRegionById("restaurant"));
-  const suppliedRestaurantSeats = /\b(?:restaurant|dining)\b/.test(normalized)
-    ? userSuppliedSeatingCount(normalized)
-    : null;
+  const suppliedRestaurantSeats = userSuppliedSeatingCount(normalized);
   return {
     estimates,
     suppliedRestaurantSeats,
@@ -346,26 +353,39 @@ export function formatFloorplanCapacityPlanning(capacityPlanning) {
   const estimates = capacityPlanning?.estimates || [];
   if (!estimates.length) return "";
   const estimateText = estimates.map((estimate) => (
-    `${estimate.label} is labelled ${estimate.areaSqm} m², which suggests about ${estimate.minimumPeople}–${estimate.maximumPeople} people using ${estimate.minimumSqmPerPerson}–${estimate.maximumSqmPerPerson} m² per person for ${estimate.occupancyType} planning`
+    estimate.diningSeatCount
+      ? `${estimate.label} contains ${estimate.diningTableCount} reviewed four-seat dining tables, for ${estimate.diningSeatCount} table seats`
+      : `${estimate.label} is labelled ${estimate.areaSqm} m², which suggests about ${estimate.minimumPeople}–${estimate.maximumPeople} people using ${estimate.minimumSqmPerPerson}–${estimate.maximumSqmPerPerson} m² per person for ${estimate.occupancyType} planning`
   )).join("; ");
+  const restaurantSeatCount = estimates.find((estimate) => estimate.regionId === "restaurant")?.diningSeatCount;
+  const referenceSeatCount = restaurantSeatCount || capacityPlanning.suppliedRestaurantSeats;
   const comparisons = estimates
     .filter((estimate) => estimate.regionId !== "restaurant")
-    .map((estimate) => `${estimate.label} scales to about ${Math.round(capacityPlanning.suppliedRestaurantSeats * estimate.areaSqm / capacityPlanning.restaurantAreaSqm)} people`);
-  const suppliedSeatText = capacityPlanning.suppliedRestaurantSeats && comparisons.length
-    ? ` Using the supplied ${capacityPlanning.suppliedRestaurantSeats}-seat restaurant assumption at the same average area per person, ${comparisons
-      .join(" and ")}; that is an area comparison, not an office-layout recommendation.`
+    .map((estimate) => `${estimate.label} scales to about ${Math.round(referenceSeatCount * estimate.areaSqm / capacityPlanning.restaurantAreaSqm)} people`);
+  const suppliedSeatText = referenceSeatCount && comparisons.length && restaurantSeatCount
+    ? ` Using the ${restaurantSeatCount} table seats drawn in the restaurant as a simple area comparison, ${comparisons
+      .join(" and ")}; that is not an office-layout recommendation.`
+    : referenceSeatCount && comparisons.length
+      ? ` Using the supplied ${referenceSeatCount}-seat restaurant assumption at the same average area per person, ${comparisons
+        .join(" and ")}; that is an area comparison, not an office-layout recommendation.`
     : "";
-  return `Best-effort planning estimate: ${estimateText}.${suppliedSeatText} ${capacityPlanning.disclaimer}`;
+  const suppliedSeatCorrection = restaurantSeatCount && capacityPlanning.suppliedRestaurantSeats
+    && capacityPlanning.suppliedRestaurantSeats !== restaurantSeatCount
+    ? ` The reviewed plan shows ${restaurantSeatCount} table seats, so it takes precedence over the supplied ${capacityPlanning.suppliedRestaurantSeats}-seat assumption.`
+    : "";
+  return `Best-effort planning estimate: ${estimateText}.${suppliedSeatText}${suppliedSeatCorrection} ${capacityPlanning.disclaimer}`;
 }
 
 export function groundFloorplanCapacityReply(reply, capacityPlanning) {
   if (!capacityPlanning) return reply;
   const text = String(reply || "");
-  const containsAllRanges = capacityPlanning.estimates.every((estimate) => (
-    new RegExp(`\\b${estimate.minimumPeople}\\s*(?:-|–|to)\\s*${estimate.maximumPeople}\\b`).test(text)
+  const containsAllEstimates = capacityPlanning.estimates.every((estimate) => (
+    estimate.diningSeatCount
+      ? new RegExp(`\\b${estimate.diningSeatCount}\\s+table seats\\b`).test(text)
+      : new RegExp(`\\b${estimate.minimumPeople}\\s*(?:-|–|to)\\s*${estimate.maximumPeople}\\b`).test(text)
   ));
   const refusal = /\b(?:cannot|can't|unable|not possible)\b[^.]{0,80}\b(?:estimate|determine|calculate|capacity|occupancy)\b/i.test(text);
-  return containsAllRanges && !refusal ? reply : formatFloorplanCapacityPlanning(capacityPlanning);
+  return containsAllEstimates && !refusal ? reply : formatFloorplanCapacityPlanning(capacityPlanning);
 }
 
 function catalogContaining(regionId) {

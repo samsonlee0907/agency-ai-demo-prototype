@@ -384,18 +384,15 @@ test("tenant provider substitutes a labelled-area capacity estimate for a model 
     { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
   );
 
-  assert.match(result.reply, /115–148 people/);
+  assert.match(result.reply, /15 reviewed four-seat dining tables, for 60 table seats/);
   assert.match(result.reply, /not a seating schedule, fire-code occupancy limit or certified building capacity/i);
   const modelInput = JSON.parse(requests[0].input[1].content[0].text);
   assert.deepEqual(modelInput.capacityPlanning.estimates[0], {
     regionId: "restaurant",
     label: "Restaurant",
     areaSqm: 207.2,
-    occupancyType: "restaurant dining",
-    minimumSqmPerPerson: 1.4,
-    maximumSqmPerPerson: 1.8,
-    minimumPeople: 115,
-    maximumPeople: 148
+    diningTableCount: 15,
+    diningSeatCount: 60
   });
 });
 
