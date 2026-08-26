@@ -29,7 +29,7 @@ export function findFloorplanAsset(id) {
 
 function referencesFloorplan(normalized) {
   const asksForPlan = /\b(floor\s*plan|floorplan|layout|map|wayfinding|navigate|navigation)\b/.test(normalized);
-  const asksAboutPlanFeature = /\b(offices?|rooms?|meeting room|reception|restaurant|dining|bar|kitchen|storage|toilets?|washrooms?|bathrooms?|restrooms?|wc|loos?|lavator(?:y|ies)|gents?|gent'?s|ladies|lady'?s|cubicles?|sinks?|basins?|urinals?|fixtures?|amenit(?:y|ies)|balcony|verandah|passage|stairs?|lifts?|elevators?|exits?)\b/.test(normalized);
+  const asksAboutPlanFeature = /\b(offices?|rooms?|meeting room|reception|restaurant|dining|bar|kitchen|storage|toilets?|washrooms?|bathrooms?|restrooms?|wc|loos?|lavator(?:y|ies)|gents?|gent'?s|ladies|lady'?s|cubicles?|sinks?|basins?|urinals?|fixtures?|capacity|occupancy|occupants?|seats?|seating|diners?|amenit(?:y|ies)|balcony|verandah|passage|stairs?|lifts?|elevators?|exits?)\b/.test(normalized);
   return asksForPlan || asksAboutPlanFeature;
 }
 
@@ -51,7 +51,7 @@ export function findFloorplanForMessage(building, message, history = []) {
 // decide visual intent whenever an approved floorplan is supplied.
 export function floorplanAnnotationRequested(message) {
   const normalized = String(message || "").toLowerCase();
-  return /\b(annotat(?:e|ed|ion)|highlight|mark|point|locate|find|identify|where|which|nearest|closest|relative|relationship|adjacent|adjoin(?:s|ing)?|beside|between|near|direction|towards?|north|south|east|west|how many|number of|count|largest|biggest|smallest|size|area|compare|comparison)\b/.test(normalized)
+  return /\b(annotat(?:e|ed|ion)|highlight|mark|point|locate|find|identify|where|which|nearest|closest|relative|relationship|adjacent|adjoin(?:s|ing)?|beside|between|near|direction|towards?|north|south|east|west|how many|number of|count|capacity|occupancy|occupants?|people|persons?|seats?|seating|diners?|hold|contain|fit|largest|biggest|smallest|size|area|compare|comparison)\b/.test(normalized)
     || /\b(next to|wayfinding|navigate|navigation|route|directions?|which way|show me the way)\b/.test(normalized)
     || /\bhow (?:do|can|would|should) i get\b/.test(normalized)
     || /\bhow to (?:get|reach|find)\b/.test(normalized)

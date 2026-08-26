@@ -346,6 +346,59 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   assert.equal(textOnly.floorplan.included, false);
 });
 
+test("tenant provider substitutes a labelled-area capacity estimate for a model refusal", async () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const requests = [];
+  const client = {
+    responses: {
+      create: async (request) => {
+        requests.push(request);
+        const response = assistantResponse({
+          included: true,
+          assetId: floorplan.id,
+          caption: "The restaurant area is highlighted for a planning estimate.",
+          annotation: {
+            selections: [
+              { regionId: "restaurant", role: "primary", reason: "This is the labelled area referenced by the question." }
+            ],
+            relationship: {
+              type: "size",
+              fromRegionId: null,
+              toRegionId: null,
+              direction: null
+            }
+          }
+        });
+        response.reply = "I cannot estimate capacity without an approved seating plan.";
+        return {
+          output_text: JSON.stringify(response)
+        };
+      }
+    }
+  };
+  const provider = liveProvider(client);
+  const result = await provider.respondToTenant(
+    findBuilding("building-meridian"),
+    "What capacity can the restaurant contain?",
+    [],
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+  );
+
+  assert.match(result.reply, /115–148 people/);
+  assert.match(result.reply, /not a seating schedule, fire-code occupancy limit or certified building capacity/i);
+  const modelInput = JSON.parse(requests[0].input[1].content[0].text);
+  assert.deepEqual(modelInput.capacityPlanning.estimates[0], {
+    regionId: "restaurant",
+    label: "Restaurant",
+    areaSqm: 207.2,
+    occupancyType: "restaurant dining",
+    minimumSqmPerPerson: 1.4,
+    maximumSqmPerPerson: 1.8,
+    minimumPeople: 115,
+    maximumPeople: 148
+  });
+});
+
 test("tenant provider lets the model resolve an indirect reverse route while the server draws it", async () => {
   const requests = [];
   const floorplan = findFloorplanAsset("floorplan-meridian-level-12");

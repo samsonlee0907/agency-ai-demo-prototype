@@ -115,6 +115,27 @@ test("tenant assistant Mock mode annotates count and size evidence deterministic
   assert.equal(size.floorplan.annotation.regions[0].areaSqm, 114.4);
 });
 
+test("tenant assistant returns labelled-area planning estimates for restaurant and office capacity questions", () => {
+  const restaurant = answerTenant("building-meridian", "What capacity can the restaurant contain?");
+  const offices = answerTenant("building-meridian", "How many people can the office area hold?");
+  const reference = answerTenant(
+    "building-meridian",
+    "If the restaurant seating plan holds 120 people, how many can the largest office hold at the same average area per person?"
+  );
+
+  assert.match(restaurant.reply, /115–148 people/);
+  assert.match(restaurant.reply, /not a seating schedule, fire-code occupancy limit or certified building capacity/i);
+  assert.deepEqual(restaurant.floorplan.annotation.regions.map((region) => region.id), ["restaurant"]);
+  assert.match(offices.reply, /West office 64\.2 m².*5–8 people/);
+  assert.match(offices.reply, /Largest office 114\.4 m².*9–14 people/);
+  assert.deepEqual(offices.floorplan.annotation.regions.map((region) => region.id), [
+    "office_west_64_2",
+    "office_east_64_2",
+    "office_114_4"
+  ]);
+  assert.match(reference.reply, /about 66 people; that is an area comparison, not an office-layout recommendation/i);
+});
+
 test("tenant assistant resolves a follow-up pronoun from the conversation", () => {
   const history = [
     { role: "user", content: "where is the gents washroom?" },

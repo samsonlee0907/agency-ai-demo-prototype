@@ -11,6 +11,8 @@ import {
   resolveFloorplanAnaphora,
   floorplanRouteForMessage,
   describeFloorplanRoute,
+  floorplanCapacityPlanningForMessage,
+  formatFloorplanCapacityPlanning,
   groundFloorplanAnnotation,
   groundFloorplanReply
 } from "./floorplan-regions.js";
@@ -670,6 +672,14 @@ function mockFloorplanAnswer(normalized) {
     plain: true
   });
   if (!floorplanAnnotationRequested(normalized)) return plainPlan();
+  const capacityPlanning = floorplanCapacityPlanningForMessage(normalized);
+  if (capacityPlanning) {
+    return {
+      reply: formatFloorplanCapacityPlanning(capacityPlanning),
+      caption: "The labelled areas used for this best-effort planning estimate are highlighted.",
+      annotation: floorplanAnnotationFallbackForMessage(normalized)
+    };
+  }
   // Wayfinding is resolved from the shared circulation graph before any hand-written
   // mock pairing, so Mock and Live draw and describe the same route.
   const wayfinding = floorplanRouteForMessage(normalized);

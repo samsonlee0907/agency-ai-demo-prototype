@@ -204,6 +204,19 @@ const contextByTarget = {
   kitchen: "reception",
   verandah: "restaurant"
 };
+const capacityInquiryPattern = /\b(?:capacity|occupancy|occupants?|people|persons?|diners?|seats?|seating|hold|contain|fit)\b/;
+const planningDensityByRegionType = {
+  restaurant: {
+    label: "restaurant dining",
+    minimumSqmPerPerson: 1.4,
+    maximumSqmPerPerson: 1.8
+  },
+  office: {
+    label: "office workplace",
+    minimumSqmPerPerson: 8,
+    maximumSqmPerPerson: 12
+  }
+};
 const toiletMentionPattern = /\b(?:toilets?|washrooms?|bathrooms?|restrooms?|cubicles?|sinks?|basins?|urinals?|fixtures?|wc|loos?|lavator(?:y|ies)|gents?|gent'?s|ladies|lady'?s|powder\s+room)\b/;
 const regionMentionPatterns = [
   ["reception", /\breception\b/],
@@ -259,6 +272,100 @@ function findRegionById(regionId) {
     if (region) return region;
   }
   return null;
+}
+
+function capacityRegionIdsForMessage(normalized) {
+  const hasRestaurant = /\b(?:restaurant|dining)\b/.test(normalized);
+  const hasOffice = /\boffices?\b/.test(normalized);
+  const ids = [];
+  if (hasRestaurant) ids.push("restaurant");
+  if (hasOffice) {
+    if (/\b(?:largest|biggest|114\.4)\b/.test(normalized)) {
+      ids.push("office_114_4");
+    } else if (/\b(?:west|western)\b/.test(normalized)) {
+      ids.push("office_west_64_2");
+    } else if (/\b(?:east|eastern)\b/.test(normalized)) {
+      ids.push("office_east_64_2");
+    } else {
+      ids.push("office_west_64_2", "office_east_64_2", "office_114_4");
+    }
+  }
+  return [...new Set(ids)];
+}
+
+function userSuppliedSeatingCount(normalized) {
+  const match = normalized.match(/\b(\d{1,4})\s*(?:seats?|diners?|people|persons?|occupants?)\b/);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isInteger(value) && value > 0 && value <= 1000 ? value : null;
+}
+
+function planningEstimateForRegion(region) {
+  const density = region.id === "restaurant"
+    ? planningDensityByRegionType.restaurant
+    : region.id.startsWith("office_")
+      ? planningDensityByRegionType.office
+      : null;
+  if (!density || !Number.isFinite(region.areaSqm)) return null;
+  return {
+    regionId: region.id,
+    label: region.label,
+    areaSqm: region.areaSqm,
+    occupancyType: density.label,
+    minimumSqmPerPerson: density.minimumSqmPerPerson,
+    maximumSqmPerPerson: density.maximumSqmPerPerson,
+    minimumPeople: Math.floor(region.areaSqm / density.maximumSqmPerPerson),
+    maximumPeople: Math.floor(region.areaSqm / density.minimumSqmPerPerson)
+  };
+}
+
+export function floorplanCapacityPlanningForMessage(message) {
+  const normalized = String(message || "").toLowerCase();
+  if (!capacityInquiryPattern.test(normalized)) return null;
+  const regionIds = capacityRegionIdsForMessage(normalized);
+  const estimates = regionIds
+    .map(findRegionById)
+    .map(planningEstimateForRegion)
+    .filter(Boolean);
+  if (!estimates.length) return null;
+
+  const restaurant = estimates.find((estimate) => estimate.regionId === "restaurant")
+    || planningEstimateForRegion(findRegionById("restaurant"));
+  const suppliedRestaurantSeats = /\b(?:restaurant|dining)\b/.test(normalized)
+    ? userSuppliedSeatingCount(normalized)
+    : null;
+  return {
+    estimates,
+    suppliedRestaurantSeats,
+    restaurantAreaSqm: restaurant.areaSqm,
+    disclaimer: "This is a best-effort space-planning estimate, not a seating schedule, fire-code occupancy limit or certified building capacity."
+  };
+}
+
+export function formatFloorplanCapacityPlanning(capacityPlanning) {
+  const estimates = capacityPlanning?.estimates || [];
+  if (!estimates.length) return "";
+  const estimateText = estimates.map((estimate) => (
+    `${estimate.label} is labelled ${estimate.areaSqm} m², which suggests about ${estimate.minimumPeople}–${estimate.maximumPeople} people using ${estimate.minimumSqmPerPerson}–${estimate.maximumSqmPerPerson} m² per person for ${estimate.occupancyType} planning`
+  )).join("; ");
+  const comparisons = estimates
+    .filter((estimate) => estimate.regionId !== "restaurant")
+    .map((estimate) => `${estimate.label} scales to about ${Math.round(capacityPlanning.suppliedRestaurantSeats * estimate.areaSqm / capacityPlanning.restaurantAreaSqm)} people`);
+  const suppliedSeatText = capacityPlanning.suppliedRestaurantSeats && comparisons.length
+    ? ` Using the supplied ${capacityPlanning.suppliedRestaurantSeats}-seat restaurant assumption at the same average area per person, ${comparisons
+      .join(" and ")}; that is an area comparison, not an office-layout recommendation.`
+    : "";
+  return `Best-effort planning estimate: ${estimateText}.${suppliedSeatText} ${capacityPlanning.disclaimer}`;
+}
+
+export function groundFloorplanCapacityReply(reply, capacityPlanning) {
+  if (!capacityPlanning) return reply;
+  const text = String(reply || "");
+  const containsAllRanges = capacityPlanning.estimates.every((estimate) => (
+    new RegExp(`\\b${estimate.minimumPeople}\\s*(?:-|–|to)\\s*${estimate.maximumPeople}\\b`).test(text)
+  ));
+  const refusal = /\b(?:cannot|can't|unable|not possible)\b[^.]{0,80}\b(?:estimate|determine|calculate|capacity|occupancy)\b/i.test(text);
+  return containsAllRanges && !refusal ? reply : formatFloorplanCapacityPlanning(capacityPlanning);
 }
 
 function catalogContaining(regionId) {
@@ -415,6 +522,20 @@ export function floorplanAnnotationFallbackForMessage(message) {
   const mentionsToilets = toiletMentionPattern.test(normalized);
   const toiletRegionId = resolveToiletRegionId(normalized);
   const asksForCount = /\b(how many|number of|count)\b/.test(normalized);
+  const capacityPlanning = floorplanCapacityPlanningForMessage(normalized);
+  if (capacityPlanning) {
+    return {
+      selections: capacityPlanning.estimates.map((estimate) => (
+        select(estimate.regionId, "primary", "This labelled area is the basis of the planning estimate.")
+      )),
+      relationship: {
+        type: "size",
+        fromRegionId: null,
+        toRegionId: null,
+        direction: null
+      }
+    };
+  }
   if (wayfindingPattern.test(normalized) && regionIds.length >= 2) {
     const { fromRegionId, toRegionId } = wayfindingEndpoints(normalized, regionIds);
     const route = routeForRegions(fromRegionId, toRegionId);
