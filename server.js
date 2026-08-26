@@ -433,7 +433,7 @@ app.use((error, _request, response, _next) => {
   const status = validationError ? 400 : error.status || (error instanceof ModelResponseError ? 502 : 500);
   const message = validationError
     ? `Invalid request: ${error.issues.map((issue) => issue.message).join(", ")}`
-    : error.message || "Unexpected server error.";
+    : error.publicMessage || error.message || "Unexpected server error.";
   if (status >= 500) console.error(error);
   response.status(status).json({ error: message });
 });

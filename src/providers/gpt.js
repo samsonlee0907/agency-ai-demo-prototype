@@ -35,9 +35,11 @@ import {
 } from "../schemas.js";
 
 export class ModelResponseError extends Error {
-  constructor(message, cause) {
+  constructor(message, cause, { outputValidation = false, publicMessage = "" } = {}) {
     super(message, { cause });
     this.name = "ModelResponseError";
+    this.outputValidation = outputValidation;
+    this.publicMessage = publicMessage;
   }
 }
 
@@ -130,21 +132,33 @@ export function groundTenantFloorplan(result, floorplan, allowAnnotation = true,
 
 function parseJsonOutput(text, schema) {
   if (!text || typeof text !== "string") {
-    throw new ModelResponseError("GPT returned an empty response.");
+    throw new ModelResponseError(
+      "GPT returned an empty response.",
+      undefined,
+      { outputValidation: true, publicMessage: "The live model returned an incomplete draft. Please try again." }
+    );
   }
 
   let parsed;
   try {
     parsed = JSON.parse(text.trim().replace(/^```json\s*/i, "").replace(/\s*```$/, ""));
   } catch (error) {
-    throw new ModelResponseError("GPT returned malformed JSON.", error);
+    throw new ModelResponseError(
+      "GPT returned malformed JSON.",
+      error,
+      { outputValidation: true, publicMessage: "The live model returned an incomplete draft. Please try again." }
+    );
   }
 
   const validated = schema.safeParse(parsed);
   if (!validated.success) {
     const issue = validated.error.issues[0];
     const location = issue?.path?.length ? ` at ${issue.path.join(".")}` : "";
-    throw new ModelResponseError(`GPT response failed validation${location}: ${issue?.message || "invalid shape"}`);
+    throw new ModelResponseError(
+      `GPT response failed validation${location}: ${issue?.message || "invalid shape"}`,
+      undefined,
+      { outputValidation: true, publicMessage: "The live model returned an incomplete draft. Please try again." }
+    );
   }
   return validated.data;
 }
@@ -247,41 +261,56 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
   });
 
   async function generateStructured({ name, instructions, input, jsonSchema, outputSchema, userContent = [] }) {
-    let response;
-    try {
-      response = await client.responses.create({
-        model: config.deployment,
-        input: [
-          {
-            role: "developer",
-            content: [{ type: "input_text", text: `${instructions}\nReturn only data matching the supplied strict JSON schema. Do not invent property or lead identifiers.` }]
-          },
-          {
-            role: "user",
-            content: [{ type: "input_text", text: JSON.stringify(input) }, ...userContent]
+    let retryInstruction = "";
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let response;
+      try {
+        response = await client.responses.create({
+          model: config.deployment,
+          input: [
+            {
+              role: "developer",
+              content: [{
+                type: "input_text",
+                text: `${instructions}\nReturn only data matching the supplied strict JSON schema. Do not invent property or lead identifiers.${retryInstruction}`
+              }]
+            },
+            {
+              role: "user",
+              content: [{ type: "input_text", text: JSON.stringify(input) }, ...userContent]
+            }
+          ],
+          text: {
+            format: {
+              type: "json_schema",
+              name,
+              strict: true,
+              schema: jsonSchema
+            }
           }
-        ],
-        text: {
-          format: {
-            type: "json_schema",
-            name,
-            strict: true,
-            schema: jsonSchema
-          }
+        });
+      } catch (error) {
+        const keyAuthDisabled = error.status === 403 && /key based authentication is disabled/i.test(error.message);
+        const roleDenied = config.authMode === "entra" && error.status === 403;
+        const message = keyAuthDisabled
+          ? "This resource disables API keys. Open Live Foundry settings and select Microsoft Entra ID authentication."
+          : roleDenied
+            ? "Microsoft Entra ID was authenticated but is not authorized for inference. Assign this identity the Cognitive Services OpenAI User role on the resource, then retry."
+            : error.message;
+        throw new ModelResponseError(`GPT request failed: ${message}`, error);
+      }
+
+      try {
+        return parseJsonOutput(response.output_text, outputSchema);
+      } catch (error) {
+        if (!(error instanceof ModelResponseError) || !error.outputValidation || attempt === 1) {
+          throw error;
         }
-      });
-    } catch (error) {
-      const keyAuthDisabled = error.status === 403 && /key based authentication is disabled/i.test(error.message);
-      const roleDenied = config.authMode === "entra" && error.status === 403;
-      const message = keyAuthDisabled
-        ? "This resource disables API keys. Open Live Foundry settings and select Microsoft Entra ID authentication."
-        : roleDenied
-          ? "Microsoft Entra ID was authenticated but is not authorized for inference. Assign this identity the Cognitive Services OpenAI User role on the resource, then retry."
-          : error.message;
-      throw new ModelResponseError(`GPT request failed: ${message}`, error);
+        retryInstruction = `\nYour prior draft was rejected by application validation (${error.message}). Generate a complete replacement that corrects this issue and keeps all other required fields valid.`;
+      }
     }
 
-    return parseJsonOutput(response.output_text, outputSchema);
+    throw new ModelResponseError("GPT structured-output retry ended unexpectedly.");
   }
 
   return {
@@ -333,7 +362,7 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
     async draftValuation(property, settings, comparables) {
       const result = await generateStructured({
         name: "valuation_draft",
-        instructions: "You are an experienced Australian property valuation copilot. Draft an evidence-led indicative valuation for qualified-valuer review. Use only the supplied fictional comparable IDs and facts. Explain adjustments candidly, keep the range ordered and never represent the output as a certified valuation.",
+        instructions: "You are an experienced Australian property valuation copilot. Draft an evidence-led indicative valuation for qualified-valuer review. Use only the supplied fictional comparable IDs and facts. Explain adjustments candidly, keep the range ordered and never represent the output as a certified valuation. Every valueLow, valueMid, valueHigh, comparable salePrice and comparable adjustedValue must be a positive whole AUD amount; never use zero, a negative number or a placeholder. Return three to five distinct approved comparable IDs.",
         input: { property, settings, comparables, effectiveDate: "16 July 2026" },
         jsonSchema: valuationJsonSchema,
         outputSchema: valuationOutputSchema
@@ -343,7 +372,7 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
     abstractLease(lease) {
       return generateStructured({
         name: "lease_abstraction",
-        instructions: `You are a careful commercial lease abstraction assistant. Extract only terms supported by the supplied pre-extracted document text. Preserve uncertainty and conflicts, identify material deadlines and obligations, and flag the output for professional legal review. Do not infer missing clauses. Keep each clause summary (term.options, all rent fields, incentive, security, outgoings, permittedUse and breakClause) at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters. Keep reviewNote concise: one to three sentences and at most ${LEASE_REVIEW_NOTE_MAX_LENGTH} characters.`,
+        instructions: `You are a careful commercial lease abstraction assistant. Extract only terms supported by the supplied pre-extracted document text. Preserve uncertainty and conflicts, identify material deadlines and obligations, and flag the output for professional legal review. Do not infer missing clauses. Every required field must contain a concise non-empty value; when the source does not state a term, write "Not stated in extracted text" rather than leaving it blank. Keep each clause summary (term.options, all rent fields, incentive, security, outgoings, permittedUse and breakClause) at most ${LEASE_CLAUSE_SUMMARY_MAX_LENGTH} characters. Keep reviewNote concise: one to three sentences and at most ${LEASE_REVIEW_NOTE_MAX_LENGTH} characters.`,
         input: { lease },
         jsonSchema: leaseJsonSchema,
         outputSchema: leaseOutputSchema

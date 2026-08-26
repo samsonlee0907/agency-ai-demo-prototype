@@ -469,9 +469,9 @@ export const valuationJsonSchema = {
   additionalProperties: false,
   required: ["valueLow", "valueMid", "valueHigh", "confidence", "effectiveDate", "summary", "comparables", "marketCommentary", "assumptions", "risks", "signOff"],
   properties: {
-    valueLow: { type: "integer" },
-    valueMid: { type: "integer" },
-    valueHigh: { type: "integer" },
+    valueLow: { type: "integer", minimum: 1 },
+    valueMid: { type: "integer", minimum: 1 },
+    valueHigh: { type: "integer", minimum: 1 },
     confidence: { type: "string", enum: ["High", "Medium", "Limited"] },
     effectiveDate: { type: "string" },
     summary: { type: "string" },
@@ -487,8 +487,8 @@ export const valuationJsonSchema = {
           id: { type: "string" },
           address: { type: "string" },
           saleDate: { type: "string" },
-          salePrice: { type: "integer" },
-          adjustedValue: { type: "integer" },
+          salePrice: { type: "integer", minimum: 1 },
+          adjustedValue: { type: "integer", minimum: 1 },
           weight: { type: "integer", minimum: 1, maximum: 100 },
           adjustments: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6 },
           rationale: { type: "string" }

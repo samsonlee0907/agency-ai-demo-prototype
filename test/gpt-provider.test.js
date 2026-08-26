@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { findMaintenanceAsset } from "../src/operations-data.js";
-import { analyseMaintenance, buildEsgEvidence } from "../src/mock-services.js";
+import {
+  abstractLease as mockAbstractLease,
+  analyseMaintenance,
+  buildEsgEvidence,
+  draftValuation as mockDraftValuation
+} from "../src/mock-services.js";
 import {
   createGptProvider,
   ensureEmergencyGuidance,
@@ -12,7 +17,7 @@ import {
   ModelResponseError,
   normalizeAssistantFollowUps
 } from "../src/providers/gpt.js";
-import { findBuilding } from "../src/data.js";
+import { comparableSales, findBuilding, findListing } from "../src/data.js";
 import { findFloorplanAsset } from "../src/floorplan-assets.js";
 import {
   ASSISTANT_REPLY_MAX_LENGTH,
@@ -58,6 +63,16 @@ function comparable(id) {
   };
 }
 
+function liveProvider(client) {
+  return createGptProvider({
+    configured: true,
+    authMode: "api-key",
+    apiKey: "test",
+    endpoint: "https://example.openai.azure.com/openai/v1/",
+    deployment: "gpt-5.6-terra"
+  }, { client });
+}
+
 test("valuation grounding restores immutable source facts", () => {
   const result = groundValuationComparables(
     { comparables: sources.map((source) => comparable(source.id)) },
@@ -76,6 +91,60 @@ test("valuation grounding rejects duplicate comparable IDs", () => {
     ),
     ModelResponseError
   );
+});
+
+test("valuation retries one malformed model draft before returning a valid response", async () => {
+  const valid = mockDraftValuation("harbour-house", {
+    purpose: "Pre-listing appraisal",
+    condition: "Renovated",
+    valuerNotes: ""
+  });
+  const requests = [];
+  const client = {
+    responses: {
+      create: async (request) => {
+        requests.push(request);
+        const response = structuredClone(valid);
+        if (requests.length === 1) response.comparables[2].adjustedValue = 0;
+        return { output_text: JSON.stringify(response) };
+      }
+    }
+  };
+
+  const result = await liveProvider(client).draftValuation(
+    findListing("harbour-house"),
+    { purpose: "Pre-listing appraisal", condition: "Renovated", valuerNotes: "" },
+    comparableSales
+  );
+
+  assert.equal(requests.length, 2);
+  assert.match(requests[1].input[0].content[0].text, /prior draft was rejected/i);
+  assert.equal(result.comparables[2].adjustedValue, valid.comparables[2].adjustedValue);
+});
+
+test("lease retries one incomplete model draft before returning a valid abstraction", async () => {
+  const valid = mockAbstractLease("lease-meridian");
+  const requests = [];
+  const client = {
+    responses: {
+      create: async (request) => {
+        requests.push(request);
+        const response = structuredClone(valid);
+        if (requests.length === 1) response.reviewNote = "";
+        return { output_text: JSON.stringify(response) };
+      }
+    }
+  };
+
+  const result = await liveProvider(client).abstractLease({
+    id: "lease-meridian",
+    title: valid.documentTitle,
+    content: "A supplied fictional lease source."
+  });
+
+  assert.equal(requests.length, 2);
+  assert.match(requests[1].input[0].content[0].text, /reviewNote/i);
+  assert.equal(result.reviewNote, valid.reviewNote);
 });
 
 test("maintenance grounding restores source readings and rejects invented signal IDs", () => {
