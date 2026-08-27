@@ -4,6 +4,7 @@ import {
   FLOORPLAN_REGION_IDS,
   findFloorplanRegionCatalog,
   floorplanAnnotationFallbackForMessage,
+  floorplanCapacityPlanningForMessage,
   floorplanCatalogForModel,
   groundFloorplanAnnotation,
   groundFloorplanReply,
@@ -97,6 +98,28 @@ test("model catalog exposes semantics without any renderer geometry", () => {
     assert.equal(item.type, "adjacent");
     for (const id of item.regionIds) assert.ok(FLOORPLAN_REGION_IDS.includes(id));
   }
+});
+
+test("capacity grounding is limited to explicit questions or terse contextual follow-ups", () => {
+  const direct = floorplanCapacityPlanningForMessage("How many people can the restaurant seat?");
+  const followUp = floorplanCapacityPlanningForMessage(
+    "What about balcony?",
+    [{ role: "user", content: "What capacity can the restaurant contain?" }]
+  );
+  const event = floorplanCapacityPlanningForMessage(
+    "Could we hold a networking event for 20 people across the restaurant and balcony?"
+  );
+
+  assert.equal(direct.estimates[0].diningSeatCount, 60);
+  assert.equal(direct.enforceExactFallback, true);
+  assert.equal(followUp.estimates[0].diningSeatCount, 16);
+  assert.equal(event.enforceExactFallback, false);
+  assert.equal(floorplanCapacityPlanningForMessage(
+    "How should a person get from the kitchen to the largest office?"
+  ), null);
+  assert.equal(floorplanCapacityPlanningForMessage(
+    "If the balcony is unavailable, what other space has seating?"
+  ), null);
 });
 
 test("floorplan asset selection recognizes relevant natural-language questions", () => {

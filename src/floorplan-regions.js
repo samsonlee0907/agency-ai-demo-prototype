@@ -205,7 +205,8 @@ const contextByTarget = {
   verandah: "restaurant",
   balcony: "restaurant"
 };
-const capacityInquiryPattern = /\b(?:capacity|occupancy|occupants?|people|persons?|diners?|seats?|seating|hold|contain|fit)\b/;
+const capacityInquiryPattern = /\b(?:capacity|occupancy|occupants?)\b|\b(?:how many|number of|count)\b[^?.]{0,48}\b(?:people|persons?|diners?|seats?)\b|\b(?:can|could|does|do|will|would)\b[^?.]{0,48}\b(?:seat|hold|contain|fit)\b/;
+const capacityDecisionPattern = /\b(?:recommend|suggest|choose|which|best|alternative|compare|versus|vs\.?|event|meeting|workshop|layout|breakdown|standing|seated|why|rain|unavailable)\b/;
 const planningDensityByRegionType = {
   restaurant: {
     label: "restaurant dining",
@@ -300,8 +301,18 @@ function capacityRegionIdsForMessage(normalized) {
 function userSuppliedSeatingCount(normalized) {
   const match = normalized.match(/\b(\d{1,4})\s*(?:seats?|diners?|people|persons?|occupants?)\b/);
   if (!match) return null;
+  const isExplicitSeatingReference = /\b(?:seats?|diners?)\b/.test(normalized)
+    || /\b(?:seating|seat)\s+plan\s+(?:holds?|seats?|fits?)\b/.test(normalized)
+    || /\b(?:assume|assuming|assumption|given|using|based on)\b/.test(normalized);
+  if (!isExplicitSeatingReference) return null;
   const value = Number(match[1]);
   return Number.isInteger(value) && value > 0 && value <= 1000 ? value : null;
+}
+
+function isEllipticalCapacityFollowUp(normalized, historyIncludesCapacity) {
+  if (!historyIncludesCapacity || normalized.split(/\s+/).filter(Boolean).length > 6) return false;
+  return /^(?:and\s+)?(?:what|how)\s+about\b/.test(normalized)
+    || /^and\s+.+/.test(normalized);
 }
 
 function planningEstimateForRegion(region) {
@@ -334,8 +345,11 @@ function planningEstimateForRegion(region) {
 
 export function floorplanCapacityPlanningForMessage(message, history = []) {
   const normalized = String(message || "").toLowerCase();
-  const historyIncludesCapacity = history.some((turn) => capacityInquiryPattern.test(String(turn?.content || "").toLowerCase()));
-  if (!capacityInquiryPattern.test(normalized) && !historyIncludesCapacity) return null;
+  const asksForCapacity = capacityInquiryPattern.test(normalized);
+  const historyIncludesCapacity = history
+    .slice(-4)
+    .some((turn) => capacityInquiryPattern.test(String(turn?.content || "").toLowerCase()));
+  if (!asksForCapacity && !isEllipticalCapacityFollowUp(normalized, historyIncludesCapacity)) return null;
   const regionIds = capacityRegionIdsForMessage(normalized);
   const estimates = regionIds
     .map(findRegionById)
@@ -350,6 +364,7 @@ export function floorplanCapacityPlanningForMessage(message, history = []) {
     estimates,
     suppliedRestaurantSeats,
     restaurantAreaSqm: restaurant.areaSqm,
+    enforceExactFallback: !capacityDecisionPattern.test(normalized),
     disclaimer: "These reviewed seating symbols and area comparisons are not a fire-code occupancy limit or certified building capacity."
   };
 }
@@ -382,7 +397,7 @@ export function formatFloorplanCapacityPlanning(capacityPlanning) {
 }
 
 export function groundFloorplanCapacityReply(reply, capacityPlanning) {
-  if (!capacityPlanning) return reply;
+  if (!capacityPlanning?.enforceExactFallback) return reply;
   const text = String(reply || "");
   const containsAllEstimates = capacityPlanning.estimates.every((estimate) => (
     estimate.diningSeatCount

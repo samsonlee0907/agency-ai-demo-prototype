@@ -47,6 +47,8 @@ export class ModelResponseError extends Error {
 }
 
 const emergencyGuidance = "If there is immediate danger, fire, injury or an electrical hazard, call 000 now and keep clear of the area.";
+const tenantAssistantEvidencePolicy = "For every request, identify the user's primary goal before selecting facts or an annotation. Give the best-supported direct answer first. For a choice, comparison, conditional plan or multi-part request, make a practical recommendation using the relevant verified facts, briefly explain the criterion, and cover each material part of the request. Do not replace a broader question with a narrower count, route or location fact. If the plan supports only part of the answer, provide that useful part, clearly name the specific unknown, and offer the safest practical next step rather than refusing wholesale. Treat subjective or operational qualities such as quietness, privacy, weather, availability, booking status and current conditions as unverified unless supplied: distinguish a spatial suggestion from a confirmation of that quality. When a question asks for a total, split, comparison or alternative across areas, address the requested scope explicitly rather than answering for one area only. capacityPlanning supplies authoritative seating counts or planning ranges, not a mandate to change the user's intent: use those facts in a recommendation where relevant. Only call an answer a certified occupancy, accessibility assessment, current-condition confirmation or emergency route when supplied evidence establishes it. If the verified circulation graph does not connect two places, say that plainly, provide general orientation if useful, and return a location or direction annotation rather than a route annotation.";
+const tenantAssistantCapacityPolicy = "Keep evidence modes separate: seating counts support seated-use questions only. For a standing, circulation, event-format or other arrangement question, state any relevant measured area or seating facts, explain the missing layout or density assumptions, and do not turn a seating count into a numerical answer for a different use.";
 
 export function ensureEmergencyGuidance(result) {
   if (result.urgency !== "Emergency" || /\b000\b/.test(result.reply)) {
@@ -114,7 +116,12 @@ export function groundTenantFloorplan(result, floorplan, allowAnnotation = true,
         );
       } catch (error) {
         const recoverableRelationshipError = /relationship|endpoint|direction|adjacency marker|route/.test(error.message);
-        if (!fallbackIntent || !recoverableRelationshipError) throw error;
+        const unverifiedRoute = /does not draw a connected route/i.test(error.message);
+        if (!fallbackIntent && unverifiedRoute) {
+          annotation = null;
+        } else if (!fallbackIntent || !recoverableRelationshipError) {
+          throw error;
+        }
       }
       if (!annotation && fallbackIntent) {
         annotation = groundFloorplanAnnotation(floorplan.asset.id, fallbackIntent);
@@ -264,6 +271,9 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
   });
 
   async function generateStructured({ name, instructions, input, jsonSchema, outputSchema, userContent = [] }) {
+    const effectiveInstructions = name === "tenant_assistant_response"
+      ? `${instructions} ${tenantAssistantEvidencePolicy} ${tenantAssistantCapacityPolicy}`
+      : instructions;
     let retryInstruction = "";
     for (let attempt = 0; attempt < 2; attempt += 1) {
       let response;
@@ -275,7 +285,7 @@ export function createGptProvider(config, { client: clientOverride } = {}) {
               role: "developer",
               content: [{
                 type: "input_text",
-                text: `${instructions}\nReturn only data matching the supplied strict JSON schema. Do not invent property or lead identifiers.${retryInstruction}`
+                text: `${effectiveInstructions}\nReturn only data matching the supplied strict JSON schema. Do not invent property or lead identifiers.${retryInstruction}`
               }]
             },
             {

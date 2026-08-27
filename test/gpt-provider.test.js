@@ -340,6 +340,10 @@ test("tenant provider sends approved floorplan bytes only for relevant image-gro
   assert.match(tenantInstructions, /keep the original plan unannotated/i);
   assert.match(tenantInstructions, /do not enumerate individual toilet fixtures/i);
   assert.match(tenantInstructions, /route safety disclaimer .* precedence over brevity/i);
+  assert.match(tenantInstructions, /identify the user's primary goal/i);
+  assert.match(tenantInstructions, /do not replace a broader question with a narrower count/i);
+  assert.match(tenantInstructions, /address the requested scope explicitly/i);
+  assert.match(tenantInstructions, /seating counts support seated-use questions only/i);
 
   const textOnly = await provider.respondToTenant(building, "What are the concierge hours?", []);
   assert.equal(requests[2].input[1].content.some((item) => item.type === "input_image"), false);
@@ -522,6 +526,33 @@ test("tenant floorplan grounding honors exclusion of a carried-over image", () =
     caption: "",
     annotation: null
   });
+});
+
+test("tenant floorplan grounding safely drops an unverified route annotation", () => {
+  const floorplan = findFloorplanAsset("floorplan-meridian-level-12");
+  const grounded = groundTenantFloorplan(
+    assistantResponse({
+      included: true,
+      assetId: floorplan.id,
+      caption: "The two areas are shown for orientation.",
+      annotation: {
+        selections: [
+          { regionId: "restaurant", role: "primary", reason: "This is the starting area." },
+          { regionId: "balcony", role: "secondary", reason: "This is the destination area." }
+        ],
+        relationship: {
+          type: "route",
+          fromRegionId: "restaurant",
+          toRegionId: "balcony",
+          direction: null
+        }
+      }
+    }),
+    { asset: floorplan, dataUrl: "data:image/jpeg;base64,/9j/2Q==" }
+  );
+
+  assert.equal(grounded.floorplan.included, true);
+  assert.equal(grounded.floorplan.annotation, null);
 });
 
 test("tenant floorplan grounding uses an authoritative fallback when visual intent is null", () => {
